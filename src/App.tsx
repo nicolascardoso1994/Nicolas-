@@ -3,6 +3,7 @@ import { Trash2, Menu, PanelLeft, Bell, ArrowRight, X } from 'lucide-react';
 import { SAMPLE_ANATOMY_PLAN, SAMPLE_MATH_PLAN, SAMPLE_PHYSICS_PLAN } from './data/samplePlan';
 import {
   AdaptiveExamSummary,
+  BibliographyEntry,
   ChartDataset,
   ExamAlert,
   ExamAttemptResult,
@@ -55,6 +56,7 @@ function loadInitialPlans(): StudyPlan[] {
             return {
               ...SAMPLE_PHYSICS_PLAN,
               ...p,
+              subjectMode: p.subjectMode || SAMPLE_PHYSICS_PLAN.subjectMode,
               folder: p.folder || SAMPLE_PHYSICS_PLAN.folder,
               pinned: p.pinned ?? SAMPLE_PHYSICS_PLAN.pinned,
               summarySections: p.summarySections?.length
@@ -73,8 +75,13 @@ function loadInitialPlans(): StudyPlan[] {
             return {
               ...SAMPLE_MATH_PLAN,
               ...p,
+              subjectMode: p.subjectMode || SAMPLE_MATH_PLAN.subjectMode,
               folder: p.folder || SAMPLE_MATH_PLAN.folder,
               examDate: p.examDate || SAMPLE_MATH_PLAN.examDate,
+              exercises:
+                p.exercises && p.exercises.length >= SAMPLE_MATH_PLAN.exercises.length
+                  ? p.exercises
+                  : SAMPLE_MATH_PLAN.exercises,
               examModels: p.examModels?.length
                 ? p.examModels
                 : SAMPLE_MATH_PLAN.examModels,
@@ -314,6 +321,18 @@ export default function App() {
     }));
   };
 
+  const handleReplaceExercises = (
+    exercises: StepByStepExercise[],
+    sourceLabel: string
+  ) => {
+    updateActivePlan((plan) => ({
+      ...plan,
+      exercises,
+      exercisesSyncedAt: new Date().toISOString(),
+      exercisesSourceLabel: sourceLabel,
+    }));
+  };
+
   const handleUpdateExamDate = (examDate: string) => {
     updateActivePlan((plan) => ({
       ...plan,
@@ -348,6 +367,21 @@ export default function App() {
     updateActivePlan((plan) => ({
       ...plan,
       examModels: (plan.examModels ?? []).filter((m) => m.id !== modelId),
+    }));
+  };
+
+  const handleAddBibliographyEntry = (entry: BibliographyEntry) => {
+    updateActivePlan((plan) => ({
+      ...plan,
+      bibliography: [entry, ...(plan.bibliography ?? [])],
+      summaryUpdatedAt: new Date().toISOString(),
+    }));
+  };
+
+  const handleDeleteBibliographyEntry = (entryId: string) => {
+    updateActivePlan((plan) => ({
+      ...plan,
+      bibliography: (plan.bibliography ?? []).filter((b) => b.id !== entryId),
     }));
   };
 
@@ -404,6 +438,7 @@ export default function App() {
       ...plan,
       examDate,
       adaptiveSummary,
+      summaryUpdatedAt: new Date().toISOString(),
     }));
   };
 
@@ -455,8 +490,9 @@ export default function App() {
 
     updateActivePlan((plan) => {
       const existing = plan.summarySections ?? [];
+      const nowIso = new Date().toISOString();
       if (existing.length === 0) {
-        return { ...plan, summarySections: suggested };
+        return { ...plan, summarySections: suggested, summaryUpdatedAt: nowIso };
       }
 
       const byOrder = new Map(suggested.map((s) => [s.order, s]));
@@ -467,7 +503,7 @@ export default function App() {
         }
       }
       merged.sort((a, b) => a.order - b.order);
-      return { ...plan, summarySections: merged };
+      return { ...plan, summarySections: merged, summaryUpdatedAt: nowIso };
     });
   };
 
@@ -477,6 +513,7 @@ export default function App() {
     updateActivePlan((plan) => ({
       ...plan,
       summarySections: prevSections,
+      summaryUpdatedAt: new Date().toISOString(),
     }));
     setPreviousSectionsByPlan((prev) => {
       const copy = { ...prev };
@@ -790,6 +827,8 @@ export default function App() {
             onAddExamModel={handleAddExamModel}
             onSaveExamAttempt={handleSaveExamAttempt}
             onDeleteExamModel={handleDeleteExamModel}
+            onAddBibliographyEntry={handleAddBibliographyEntry}
+            onDeleteBibliographyEntry={handleDeleteBibliographyEntry}
             readingMode={readingMode}
             onToggleReadingMode={handleToggleReadingMode}
             nightMode={nightMode}
@@ -808,8 +847,11 @@ export default function App() {
 
         {activeTab === 'exercises' && (
           <StepByStepView
+            key={activePlan.id}
             plan={activePlan}
             onAddExercise={handleAddExercise}
+            onReplaceExercises={handleReplaceExercises}
+            onNavigateTab={setActiveTab}
             onOpenChart={(dataset) => {
               setActiveChartDataset(dataset);
               setActiveTab('charts');

@@ -3,6 +3,7 @@ import { StudyPlan } from '../types/study';
 export const SAMPLE_PHYSICS_PLAN: StudyPlan = {
   id: 'plan-fisica-1-demo',
   subject: 'Física I — Dinámica, Rozamiento y Energía',
+  subjectMode: 'quantitative',
   examType: 'Primer Parcial',
   examDate: '2026-11-17',
   folder: 'Física',
@@ -692,6 +693,7 @@ export const SAMPLE_PHYSICS_PLAN: StudyPlan = {
 export const SAMPLE_MATH_PLAN: StudyPlan = {
   id: 'plan-analisis-2-demo',
   subject: 'Análisis Matemático II — Integrales y Series',
+  subjectMode: 'quantitative',
   examType: 'Segundo Parcial',
   examDate: '2026-11-22',
   folder: 'Matemática',
@@ -887,6 +889,63 @@ export const SAMPLE_MATH_PLAN: StudyPlan = {
         },
       ],
       finalAnswer: 'Radio $R = 3$ e intervalo de convergencia $[-1, 5)$.',
+    },
+    {
+      id: 'ex-math-2',
+      title: 'Integral impropia de primera especie por partes',
+      topic: 'Integrales Impropias e Integración por Partes',
+      difficulty: 'Integrador',
+      statement:
+        'Determinar si la integral impropia $\\int_{0}^{\\infty} x e^{-2x}\\,dx$ converge o diverge y, en caso de converger, calcular su valor exacto.',
+      givenData: [
+        { symbol: 'I', value: '∫₀^∞ x e^{-2x} dx', unit: '-' },
+        { symbol: 'a', value: '0', unit: '-' },
+      ],
+      unknowns: ['Convergencia de la integral impropia', 'Valor exacto del límite'],
+      visualConfig: { type: 'none' },
+      steps: [
+        {
+          stepNumber: 1,
+          title: 'Escribir la integral impropia como límite',
+          thinkingPrompt: 'No evaluamos $\\infty$ como un número directo; reemplazamos el extremo superior por un parámetro $b \\to \\infty$.',
+          mathLatex:
+            '\\int_{0}^{\\infty} x e^{-2x}\\,dx = \\lim_{b \\to \\infty} \\int_{0}^{b} x e^{-2x}\\,dx',
+          explanation:
+            'Convertimos la integral impropia en una integral definida propia en $[0, b]$ y dejamos el límite afuera para evaluarlo recién al final.',
+          watchOut: 'Nunca reemplaces $\\infty$ directo dentro de la primitiva sin escribir el límite.',
+        },
+        {
+          stepNumber: 2,
+          title: 'Hallar la primitiva con Integración por Partes (ILATE)',
+          thinkingPrompt: 'Tenemos producto de polinomio $x$ por exponencial $e^{-2x}$. Según ILATE, elegimos $u = x$ porque al derivar desaparece.',
+          mathLatex:
+            'u = x \\implies du = dx \\qquad ; \\qquad dv = e^{-2x}\\,dx \\implies v = -\\frac{1}{2}e^{-2x}',
+          explanation:
+            'Aplicando $\\int u\\,dv = uv - \\int v\\,du$, obtenemos $F(x) = -\\frac{x}{2}e^{-2x} - \\frac{1}{4}e^{-2x}$.',
+          watchOut: 'Cuidá el doble signo menos al integrar $e^{-2x}$ y aplicarlo en $-\\int v\\,du$.',
+          quickCheck: {
+            question: '¿Por qué conviene elegir $u = x$ y no $u = e^{-2x}$?',
+            options: [
+              'Porque $e^{-2x}$ no tiene primitiva elemental',
+              'Porque al derivar $x$ baja el grado a $1$ y simplifica la integral restante',
+              'Porque siempre se elige la función de la derecha como $u$',
+            ],
+            correctIndex: 1,
+            feedback: 'Exacto: elegir $u = x$ reduce el polinomio en un paso.',
+          },
+        },
+        {
+          stepNumber: 3,
+          title: 'Evaluar en $[0, b]$ y tomar el límite cuando $b \\to \\infty$',
+          thinkingPrompt: 'En $b \\to \\infty$, el término $-\\frac{b}{2}e^{-2b}$ presenta una indeterminación $\\infty \\cdot 0$ que se resuelve con L’Hôpital.',
+          mathLatex:
+            '\\lim_{b \\to \\infty} \\left[\\left(-\\frac{b}{2}e^{-2b} - \\frac{1}{4}e^{-2b}\\right) - \\left(0 - \\frac{1}{4}\\right)\\right] = 0 - 0 + \\frac{1}{4} = \\frac{1}{4}',
+          explanation:
+            'Como $e^{2b}$ crece exponencialmente más rápido que $b$, $\\lim_{b\\to\\infty} \\frac{b}{2e^{2b}} = 0$. El valor final resulta finito e igual a $1/4$.',
+          watchOut: 'No olvides evaluar el extremo inferior $x = 0$: allí $e^0 = 1$, no $0$.',
+        },
+      ],
+      finalAnswer: 'La integral impropia converge y su valor exacto es $\\frac{1}{4}$.',
     },
   ],
   examModels: [

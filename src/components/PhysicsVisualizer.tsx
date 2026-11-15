@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { ExerciseVisualConfig } from '../types/study';
 import { VisualDiagramCard } from './VisualDiagramCard';
@@ -30,6 +30,11 @@ export function PhysicsVisualizer({
 
   const [simAngle, setSimAngle] = useState<number>(baseAngle);
   const [simVel, setSimVel] = useState<number>(baseVel);
+
+  useEffect(() => {
+    setSimAngle(baseAngle);
+    setSimVel(baseVel);
+  }, [baseAngle, baseVel, type]);
 
   // Reset helper when problem parameters differ
   const effectiveAngle = simAngle;

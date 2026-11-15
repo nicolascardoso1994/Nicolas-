@@ -786,6 +786,24 @@ const singleExerciseSchema = {
   ],
 };
 
+const exercisesFromSummarySchema = {
+  type: Type.OBJECT,
+  properties: {
+    sourceLabel: {
+      type: Type.STRING,
+      description:
+        "Etiqueta breve que identifica qué parte del resumen se tomó como base (ej: Resumen base, Resumen adaptado al parcial, Bibliografía cargada o título de sección).",
+    },
+    exercises: {
+      type: Type.ARRAY,
+      description:
+        "Exactamente 2 ejercicios o casos visuales paso a paso adaptados estrictamente al resumen proporcionado.",
+      items: singleExerciseSchema,
+    },
+  },
+  required: ["sourceLabel", "exercises"],
+};
+
 const adaptiveExamSummarySchema = {
   type: Type.OBJECT,
   properties: {
@@ -1027,6 +1045,56 @@ const gradeExamSchema = {
     },
   },
   required: ["overallFeedback", "questionGrades"],
+};
+
+const bibliographyAnalysisSchema = {
+  type: Type.OBJECT,
+  properties: {
+    suggestedTitle: {
+      type: Type.STRING,
+      description: "Título claro y breve de esta lectura o bibliografía (ej: Guyton Cap. 14 — Circulación sistémica).",
+    },
+    summary: {
+      type: Type.STRING,
+      description:
+        "Síntesis clara y directa enfocada estrictamente en la parte de la bibliografía que el estudiante indicó estudiar.",
+    },
+    relevantSections: {
+      type: Type.ARRAY,
+      description: "Secciones, capítulos, figuras o fragmentos relevantes encontrados en el material.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          sectionTitle: { type: Type.STRING },
+          pageOrLocationHint: {
+            type: Type.STRING,
+            description: "Ubicación aproximada si figura en el material (ej: Capítulo 3, Págs. 45-52, Figura 2, o Subtema).",
+          },
+          whyRelevant: {
+            type: Type.STRING,
+            description: "Por qué este fragmento responde exactamente a lo que el estudiante necesita estudiar.",
+          },
+          keyTakeaways: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "3 a 5 ideas clave concretas y evaluables extraídas de ese fragmento.",
+          },
+        },
+        required: ["sectionTitle", "whyRelevant", "keyTakeaways"],
+      },
+    },
+    discardOrSkip: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "Partes del material cargado que conviene saltear o dejar como lectura secundaria según el foco pedido.",
+    },
+    studyRecommendations: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "3 a 4 pasos concretos de cómo estudiar esta selección bibliográfica para el examen.",
+    },
+  },
+  required: ["suggestedTitle", "summary", "relevantSections", "discardOrSkip", "studyRecommendations"],
 };
 
 async function startServer() {
@@ -1308,25 +1376,53 @@ INSTRUCCIONES ESTRICTAS:
 
   app.post("/api/solve-exercise", ...geminiGuard, async (req, res) => {
     try {
-      const { subject = "Física Universitaria", statement = "", files = [] } = req.body ?? {};
+      const {
+        subject = "Física Universitaria",
+        subjectMode,
+        statement = "",
+        files = [],
+        summaryContext,
+      } = req.body ?? {};
       if ((!statement || String(statement).trim().length === 0) && (!Array.isArray(files) || files.length === 0)) {
         return res.status(400).json({ error: "Escribí el enunciado del ejercicio o adjuntá una imagen/PDF." });
       }
 
       const ai = getAiClient();
-      const prompt = `
-Analizá paso a paso el siguiente problema, caso o estructura de la materia "${subject}" para que el estudiante comprenda el razonamiento completo.
+      const contextSections = Array.isArray(summaryContext?.summarySections)
+        ? summaryContext.summarySections
+            .slice(0, 6)
+            .map(
+              (s: { order?: number; title?: string; content?: string; formulaLatex?: string }) =>
+                `- ${s.order ?? ""}. ${s.title ?? ""}: ${String(s.content ?? "").slice(0, 320)}${
+                  s.formulaLatex ? ` [Fórmula: ${s.formulaLatex}]` : ""
+                }`
+            )
+            .join("\n")
+        : "";
+      const contextFormulas = Array.isArray(summaryContext?.formulas)
+        ? summaryContext.formulas
+            .slice(0, 6)
+            .map((f: { name?: string; latex?: string }) => `- ${f.name ?? ""}: ${f.latex ?? ""}`)
+            .join("\n")
+        : "";
+      const isTheoretical = subjectMode === "theoretical";
 
+      const prompt = `
+Analizá paso a paso el siguiente problema, caso o estructura de la materia "${subject}" para que el estudiante comprenda el razonamiento completo, manteniéndote alineado con el resumen que está estudiando.
+
+PERFIL DEL RESUMEN ACTIVO:
+- Modo de la materia: ${isTheoretical ? "TEÓRICA / VISUAL (NO usar cálculos ni fórmulas matemáticas)" : subjectMode === "quantitative" ? "CUANTITATIVA (fórmulas y cálculos)" : "Detectar según el enunciado y la materia"}
+${contextSections ? `Secciones del resumen actual:\n${contextSections}\n` : ""}${!isTheoretical && contextFormulas ? `Fórmulas del resumen:\n${contextFormulas}\n` : ""}
 ENUNCIADO / TEMA:
 ${statement || "(Revisá la imagen o documento adjunto para extraer el contenido completo.)"}
 
 REQUISITOS IMPORTANTES SEGÚN EL TIPO DE MATERIA:
-- Si la materia o consigna NO requiere cálculos matemáticos (por ejemplo Anatomía, Biología, Histología, Derecho, Historia o temas teóricos/morfológicos):
+- Si la materia o consigna NO requiere cálculos matemáticos (o si el modo es TEÓRICA / VISUAL, como Anatomía, Biología, Histología, Derecho, Historia o temas teóricos/morfológicos):
   - **NO inventes cuentas ni fórmulas matemáticas**: dejá \`mathLatex\` como cadena vacía \`""\`.
   - Usá \`visualConfig.type = "visual_diagram"\` y completá \`visualConfig.visualExample\` con un esquema claro (\`templateId\`: \`heart\`, \`cell\`, \`neuron\`, \`respiratory\`, \`nephron\`, \`bone\` o \`custom\` con \`shapes\`) y 4 a 6 \`parts\` reales con coordenadas sobre 400×260.
   - Descomponé el tema en 4 a 5 pasos visuales/conceptuales conectando cada paso con \`highlightPartNumber\` (1..6).
 - Si la materia SÍ requiere cálculos (Física, Matemática, Química cuantitativa):
-  - Descomponé en 4 a 6 pasos con ecuaciones en \`mathLatex\` (LaTeX puro sin \`$$\`), \`thinkingPrompt\`, \`watchOut\` y verificaciones SI.
+  - Descomponé en 4 a 6 pasos con ecuaciones en \`mathLatex\` (LaTeX puro sin \`$$\`), \`thinkingPrompt\`, \`watchOut\` y verificaciones SI coherentes con el resumen activo.
   - Si es plano inclinado o proyectil, configurá \`visualConfig\` (\`inclined_plane\` o \`projectile\`).
 - En todos los casos incluí \`quickCheck\` en al menos 2-3 pasos para que el alumno compruebe lo aprendido.
 `;
@@ -1340,7 +1436,7 @@ REQUISITOS IMPORTANTES SEGÚN EL TIPO DE MATERIA:
           responseMimeType: "application/json",
           responseSchema: singleExerciseSchema,
           systemInstruction:
-            "Sos un docente universitario claro y visual. Si la materia es teórica, anatómica o biológica sin cálculos, explicás con esquemas visuales y partes anatómicas reales sin inventar matemática; si es cuantitativa, explicás con precisión matemática en español.",
+            "Sos un docente universitario claro y visual. Si la materia es teórica, anatómica o biológica sin cálculos, explicás con esquemas visuales y partes anatómicas reales sin inventar matemática; si es cuantitativa, explicás con precisión matemática en español alineado al resumen del estudiante.",
         },
       });
 
@@ -1384,6 +1480,243 @@ REQUISITOS IMPORTANTES SEGÚN EL TIPO DE MATERIA:
         },
         steps: Array.isArray(parsed.steps) ? parsed.steps : [],
         finalAnswer: parsed.finalAnswer ?? "",
+      });
+    } catch (err) {
+      const { status, message } = extractGeminiError(err);
+      return res.status(status).json({ error: message });
+    }
+  });
+
+  app.post("/api/generate-exercises-from-summary", ...geminiGuard, async (req, res) => {
+    try {
+      const {
+        subject = "Materia Universitaria",
+        examType = "Parcial",
+        subjectMode,
+        sourceType = "base",
+        targetSectionTitle = "",
+        executiveSummary = "",
+        summarySections = [],
+        keyConcepts = [],
+        formulas = [],
+        adaptiveSummary = null,
+        bibliography = [],
+        focusInstruction = "",
+      } = req.body ?? {};
+
+      const hasFormulas = Array.isArray(formulas) && formulas.length > 0;
+      const isTheoretical = subjectMode === "theoretical" || (!subjectMode && !hasFormulas);
+
+      const sectionsBlock = Array.isArray(summarySections)
+        ? summarySections
+            .map(
+              (s: { order?: number; title?: string; content?: string; formulaLatex?: string }) =>
+                `${s.order ?? ""}. ${s.title ?? ""}\n${s.content ?? ""}${
+                  s.formulaLatex ? `\nFórmula: ${s.formulaLatex}` : ""
+                }`
+            )
+            .join("\n\n")
+        : "";
+
+      const conceptsBlock = Array.isArray(keyConcepts)
+        ? keyConcepts
+            .slice(0, 8)
+            .map(
+              (c: { term?: string; simpleExplanation?: string }) =>
+                `- ${c.term ?? ""}: ${c.simpleExplanation ?? ""}`
+            )
+            .join("\n")
+        : "";
+
+      const formulasBlock =
+        !isTheoretical && Array.isArray(formulas)
+          ? formulas
+              .slice(0, 8)
+              .map(
+                (f: { name?: string; latex?: string; whenToUse?: string }) =>
+                  `- ${f.name ?? ""} (${f.latex ?? ""}): ${f.whenToUse ?? ""}`
+              )
+              .join("\n")
+          : "";
+
+      const adaptiveBlock =
+        adaptiveSummary && typeof adaptiveSummary === "object"
+          ? [
+              `Estrategia: ${adaptiveSummary.strategyTitle ?? ""}`,
+              `Síntesis: ${adaptiveSummary.compressedSummary ?? ""}`,
+              ...(Array.isArray(adaptiveSummary.summarySections)
+                ? adaptiveSummary.summarySections.map(
+                    (s: { order?: number; title?: string; content?: string }) =>
+                      `${s.order ?? ""}. ${s.title ?? ""}: ${s.content ?? ""}`
+                  )
+                : []),
+              ...(Array.isArray(adaptiveSummary.priorityTopics)
+                ? adaptiveSummary.priorityTopics.map(
+                    (t: { topic?: string; weight?: string; quickRule?: string }) =>
+                      `- Prioridad (${t.weight ?? ""}) ${t.topic ?? ""}: ${t.quickRule ?? ""}`
+                  )
+                : []),
+            ].join("\n")
+          : "";
+
+      const bibBlock = Array.isArray(bibliography)
+        ? bibliography
+            .slice(0, 5)
+            .map(
+              (b: {
+                title?: string;
+                focusPrompt?: string;
+                analysis?: {
+                  summary?: string;
+                  relevantSections?: Array<{ sectionTitle?: string; keyTakeaways?: string[] }>;
+                };
+              }) =>
+                `[${b.title ?? "Lectura"} — Foco: ${b.focusPrompt ?? ""}]\n${
+                  b.analysis?.summary ?? ""
+                }\n${
+                  Array.isArray(b.analysis?.relevantSections)
+                    ? b.analysis.relevantSections
+                        .map(
+                          (sec) =>
+                            `  * ${sec.sectionTitle ?? ""}: ${(sec.keyTakeaways ?? []).join("; ")}`
+                        )
+                        .join("\n")
+                    : ""
+                }`
+            )
+            .join("\n\n")
+        : "";
+
+      let sourceDirective = "Todo el resumen actual de la materia";
+      let friendlyLabel = "Resumen actual";
+
+      if (sourceType === "adaptive" && adaptiveBlock) {
+        sourceDirective = "El RESUMEN ADAPTADO AL EXAMEN (prioridades críticas según días restantes)";
+        friendlyLabel = "Resumen adaptado al examen";
+      } else if (sourceType === "bibliography" && bibBlock) {
+        sourceDirective = "La BIBLIOGRAFÍA DE AYUDA cargada por el estudiante y su foco de estudio";
+        friendlyLabel = "Bibliografía de ayuda";
+      } else if (sourceType === "section" && targetSectionTitle) {
+        sourceDirective = `Específicamente la sección del resumen titulada: "${targetSectionTitle}"`;
+        friendlyLabel = `Sección: ${targetSectionTitle}`;
+      }
+
+      const ai = getAiClient();
+      const prompt = `
+Generá exactamente 2 guías interactivas de "Paso a Paso" diseñadas específicamente a partir del RESUMEN en el que está trabajando el estudiante.
+
+MATERIA Y CONTEXTO:
+- Materia: ${subject} (${examType})
+- Perfil pedagógico: ${isTheoretical ? "TEÓRICA / VISUAL (NO usar cálculos ni fórmulas matemáticas)" : "CUANTITATIVA (ejercicios numéricos o analíticos con fórmulas reales)"}
+- Fuente principal solicitada: ${sourceDirective}
+${focusInstruction ? `- Pedido adicional del estudiante: ${focusInstruction}` : ""}
+
+RESUMEN BASE DE LA MATERIA:
+${executiveSummary ? `Síntesis ejecutiva: ${executiveSummary}\n\n` : ""}${sectionsBlock ? `Secciones del resumen:\n${sectionsBlock}\n\n` : ""}${conceptsBlock ? `Conceptos clave:\n${conceptsBlock}\n\n` : ""}${formulasBlock ? `Fórmulas:\n${formulasBlock}\n\n` : ""}${adaptiveBlock ? `RESUMEN ADAPTADO AL EXAMEN:\n${adaptiveBlock}\n\n` : ""}${bibBlock ? `BIBLIOGRAFÍA DE AYUDA:\n${bibBlock}\n\n` : ""}
+
+INSTRUCCIONES ESTRICTAS:
+1. Cada uno de los 2 elementos en \`exercises\` debe corresponder directamente a los temas, conceptos o ecuaciones del resumen indicado en "Fuente principal solicitada" (uno de dificultad "Base" o "Parcial" y otro "Parcial" o "Integrador").
+2. ${
+        isTheoretical
+          ? `Como la materia es TEÓRICA / VISUAL:
+   - PROHIBIDO inventar cuentas, números artificiales o fórmulas matemáticas. Dejá \`steps[].mathLatex\` vacío \`""\`.
+   - En ambos casos usá \`visualConfig.type = "visual_diagram"\` con un \`visualExample\` detallado (\`templateId\`: \`heart\`, \`cell\`, \`neuron\`, \`respiratory\`, \`nephron\`, \`bone\` o \`custom\` con \`shapes\` vectoriales sobre 400×260) y 4 a 6 \`parts\` clave.
+   - En cada paso asigná \`highlightPartNumber\` (1..6), qué observar en el esquema (\`thinkingPrompt\`), desarrollo claro (\`explanation\`), error típico (\`watchOut\`) y \`quickCheck\` en al menos 2 pasos.`
+          : `Como la materia es CUANTITATIVA:
+   - Creá 2 problemas universitarios concretos y resueltos paso a paso usando exactamente los métodos y fórmulas del resumen indicado.
+   - En cada paso completá \`thinkingPrompt\`, \`mathLatex\` (LaTeX puro sin \`$$\`), \`explanation\`, \`watchOut\` y \`quickCheck\` en al menos 2 pasos.
+   - Configurá \`visualConfig.type\` como \`inclined_plane\` o \`projectile\` solo si el problema es exactamente de plano inclinado o tiro horizontal; de lo contrario usá \`circuit_or_generic\` o \`none\`.`
+      }
+3. En \`sourceLabel\`, devolvé una etiqueta corta y clara (ej: "${friendlyLabel}").
+`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-4-hydrogen",
+        contents: prompt,
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
+          responseMimeType: "application/json",
+          responseSchema: exercisesFromSummarySchema,
+          systemInstruction:
+            "Sos un profesor universitario que construye práctica paso a paso estrictamente alineada al resumen actual del alumno en español. Nunca inventes fórmulas en materias teóricas o anatómicas; usá esquemas visuales con partes señaladas.",
+        },
+      });
+
+      const parsed = JSON.parse((response.text ?? "{}").trim());
+      const nowId = Date.now();
+      const rawExercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
+
+      const normalizedExercises = rawExercises.map(
+        (ex: Record<string, unknown>, idx: number) => {
+          const vc = (ex.visualConfig ?? { type: "none" }) as Record<string, unknown>;
+          const vis = vc.visualExample as Record<string, unknown> | undefined;
+          return {
+            id: `ex-sync-${nowId}-${idx}`,
+            title: String(ex.title ?? `Práctica ${idx + 1}`),
+            topic: String(ex.topic ?? subject),
+            difficulty: ["Base", "Parcial", "Integrador"].includes(String(ex.difficulty))
+              ? String(ex.difficulty)
+              : idx === 0
+                ? "Parcial"
+                : "Integrador",
+            statement: String(ex.statement ?? ""),
+            givenData: Array.isArray(ex.givenData) ? ex.givenData : [],
+            unknowns: Array.isArray(ex.unknowns) ? ex.unknowns.map(String) : [],
+            visualConfig: {
+              ...vc,
+              type: String(vc.type ?? "none"),
+              visualExample:
+                vis && Array.isArray(vis.parts) && vis.parts.length > 0
+                  ? {
+                      id: `ex-sync-vis-${nowId}-${idx}`,
+                      title: String(vis.title ?? ex.title ?? "Esquema visual"),
+                      categoryLabel: String(vis.categoryLabel ?? "Ejemplo gráfico"),
+                      caption: String(vis.caption ?? ""),
+                      templateId: String(vis.templateId ?? "custom"),
+                      shapes: Array.isArray(vis.shapes) ? vis.shapes : undefined,
+                      parts: vis.parts.map((p: Record<string, unknown>, pIdx: number) => ({
+                        id: `ex-sync-part-${nowId}-${idx}-${pIdx + 1}`,
+                        number: Number(p.number) || pIdx + 1,
+                        label: String(p.label ?? `Parte ${pIdx + 1}`),
+                        location: String(p.location ?? ""),
+                        description: String(p.description ?? ""),
+                        examTip: String(p.examTip ?? ""),
+                        x: Math.min(380, Math.max(20, Number(p.x) || 80 + pIdx * 55)),
+                        y: Math.min(240, Math.max(20, Number(p.y) || 120)),
+                      })),
+                    }
+                  : undefined,
+            },
+            steps: Array.isArray(ex.steps)
+              ? ex.steps.map((s: Record<string, unknown>, sIdx: number) => ({
+                  stepNumber: Number(s.stepNumber) || sIdx + 1,
+                  title: String(s.title ?? `Paso ${sIdx + 1}`),
+                  thinkingPrompt: String(s.thinkingPrompt ?? ""),
+                  mathLatex: isTheoretical ? "" : String(s.mathLatex ?? ""),
+                  explanation: String(s.explanation ?? ""),
+                  watchOut: String(s.watchOut ?? ""),
+                  highlightElement: s.highlightElement ? String(s.highlightElement) : undefined,
+                  highlightPartNumber:
+                    s.highlightPartNumber !== undefined
+                      ? Number(s.highlightPartNumber)
+                      : undefined,
+                  quickCheck: s.quickCheck ?? undefined,
+                }))
+              : [],
+            finalAnswer: String(ex.finalAnswer ?? ""),
+          };
+        }
+      );
+
+      if (normalizedExercises.length === 0) {
+        return res.status(500).json({
+          error: "No se pudieron generar ejercicios paso a paso para este resumen.",
+        });
+      }
+
+      return res.json({
+        sourceLabel: String(parsed.sourceLabel || friendlyLabel),
+        exercises: normalizedExercises,
       });
     } catch (err) {
       const { status, message } = extractGeminiError(err);
@@ -2228,6 +2561,130 @@ INSTRUCCIONES DE CORRECCIÓN:
         answers: safeAnswers,
         questionResults,
       });
+    } catch (err) {
+      const { status, message } = extractGeminiError(err);
+      return res.status(status).json({ error: message });
+    }
+  });
+
+  app.post("/api/analyze-bibliography", ...geminiGuard, async (req, res) => {
+    try {
+      const {
+        subject = "Materia Universitaria",
+        subjectMode = "quantitative",
+        examType = "Parcial",
+        title = "",
+        focusPrompt = "",
+        notesText = "",
+        previousSummaryContext = "",
+        fileNames = [],
+        files = [],
+      } = req.body ?? {};
+
+      const trimmedFocus = typeof focusPrompt === "string" ? focusPrompt.trim() : "";
+      if (!trimmedFocus) {
+        return res.status(400).json({
+          error: "Indicá en el cuadro de diálogo qué parte de la bibliografía necesitás estudiar o es relevante.",
+        });
+      }
+
+      const safeFiles = Array.isArray(files) ? files : [];
+      const trimmedNotes = typeof notesText === "string" ? notesText.trim() : "";
+      const trimmedContext =
+        typeof previousSummaryContext === "string" ? previousSummaryContext.trim() : "";
+
+      if (safeFiles.length === 0 && !trimmedNotes && !trimmedContext) {
+        return res.status(400).json({
+          error: "Subí al menos un archivo (PDF, imagen, texto) o pegá fragmentos del material de lectura.",
+        });
+      }
+
+      const ai = getAiClient();
+      const isTheoretical = subjectMode === "theoretical";
+
+      const prompt = `
+Sos un ayudante de cátedra y tutor universitario experto en lectura estratégica de bibliografía.
+El estudiante subió material de lectura para la materia "${subject}" (${examType}) y te indica específicamente QUÉ PARTE necesita estudiar o considera relevante.
+
+INDICACIÓN DEL ESTUDIANTE (QUÉ PARTE NECESITA ESTUDIAR):
+"${trimmedFocus}"
+
+${title ? `TÍTULO SUGERIDO POR EL ALUMNO: ${String(title).trim()}` : ""}
+${trimmedNotes ? `\nTEXTO O FRAGMENTOS PEGADOS DEL MATERIAL:\n${trimmedNotes.slice(0, 50000)}\n` : ""}
+${trimmedContext ? `\nCONTEXTO PREVIO EXTRAÍDO DE ESTA BIBLIOGRAFÍA:\n${trimmedContext.slice(0, 8000)}\n` : ""}
+
+INSTRUCCIONES ESTRICTAS:
+1. Leé e interpretá los archivos adjuntos (PDFs, páginas fotografiadas, gráficos, esquemas o textos) y/o el texto pegado.
+2. Filtrá el contenido para responder DIRECTAMENTE a la indicación del estudiante: extraé las secciones, capítulos, definiciones, procesos o gráficos relevantes para lo que necesita estudiar.
+3. En \`summary\`: escribí una síntesis clara y amigable (3 a 5 oraciones) explicando qué contiene esa parte relevante y cómo se conecta con el examen.
+4. En \`relevantSections\`: devolvé entre 2 y 5 apartados concretos del material con su título real o descriptivo, ubicación aproximada (\`pageOrLocationHint\`, ej: "Págs. 12–15", "Figura 3", "Sección 2.4"), por qué responde a lo pedido (\`whyRelevant\`) y 3 a 5 ideas clave concretas en \`keyTakeaways\`.
+5. En \`discardOrSkip\`: indicá qué partes del documento/bibliografía NO hace falta profundizar ahora según el objetivo que indicó el alumno.
+6. En \`studyRecommendations\`: proponé 3 acciones prácticas para fijar ese recorte bibliográfico antes de rendir.
+7. ${
+        isTheoretical
+          ? "ATENCIÓN — MATERIA TEÓRICA / DESCRIPTIVA: NO inventes fórmulas ni cuentas matemáticas. Priorizá relaciones conceptuales, estructuras anatómicas/biológicas, procesos y lectura de esquemas."
+          : "Si aparecen ecuaciones o leyes cuantitativas clave en el texto, podés escribirlas limpias con `$ ... $`."
+      }
+`;
+
+      const contents = buildContentParts(prompt, safeFiles);
+      const response = await ai.models.generateContent({
+        model: "gemini-4-hydrogen",
+        contents: { parts: contents },
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
+          responseMimeType: "application/json",
+          responseSchema: bibliographyAnalysisSchema,
+          systemInstruction:
+            "Respondés únicamente en español claro, preciso y académico. Tu función es filtrar bibliografía extensa y ayudar al estudiante a enfocarse únicamente en los capítulos, páginas o conceptos relevantes que indicó.",
+        },
+      });
+
+      const parsed = JSON.parse((response.text ?? "{}").trim());
+      const nowIso = new Date().toISOString();
+      const resolvedFileNames =
+        safeFiles.length > 0
+          ? safeFiles.map((f: { name?: string }) => String(f.name || "Archivo adjunto"))
+          : Array.isArray(fileNames)
+            ? fileNames.map(String)
+            : [];
+
+      const entry = {
+        id: `bib-${Date.now()}`,
+        title: String(
+          String(title).trim() ||
+            parsed.suggestedTitle ||
+            resolvedFileNames[0] ||
+            `Bibliografía · ${subject}`
+        ),
+        createdAt: nowIso,
+        focusPrompt: trimmedFocus,
+        fileNames: resolvedFileNames,
+        notesPreview: trimmedNotes ? trimmedNotes.slice(0, 2000) : undefined,
+        analysis: {
+          analyzedAt: nowIso,
+          focusPrompt: trimmedFocus,
+          summary: String(parsed.summary ?? ""),
+          relevantSections: Array.isArray(parsed.relevantSections)
+            ? parsed.relevantSections.map((s: Record<string, unknown>, idx: number) => ({
+                sectionTitle: String(s.sectionTitle ?? `Apartado ${idx + 1}`),
+                pageOrLocationHint: s.pageOrLocationHint ? String(s.pageOrLocationHint) : undefined,
+                whyRelevant: String(s.whyRelevant ?? ""),
+                keyTakeaways: Array.isArray(s.keyTakeaways)
+                  ? s.keyTakeaways.map(String)
+                  : [],
+              }))
+            : [],
+          discardOrSkip: Array.isArray(parsed.discardOrSkip)
+            ? parsed.discardOrSkip.map(String)
+            : [],
+          studyRecommendations: Array.isArray(parsed.studyRecommendations)
+            ? parsed.studyRecommendations.map(String)
+            : [],
+        },
+      };
+
+      return res.json({ entry });
     } catch (err) {
       const { status, message } = extractGeminiError(err);
       return res.status(status).json({ error: message });

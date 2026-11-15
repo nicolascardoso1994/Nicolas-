@@ -12,13 +12,21 @@ import {
   Loader2,
   Moon,
   Eye,
+  Library,
 } from 'lucide-react';
-import { ExamAttemptResult, ExamModel, StudyPlan, StudyTab } from '../types/study';
+import {
+  BibliographyEntry,
+  ExamAttemptResult,
+  ExamModel,
+  StudyPlan,
+  StudyTab,
+} from '../types/study';
 import { MathText } from './MathText';
 import { RevealableFormula } from './RevealableFormula';
 import { SummaryPdfSheet } from './SummaryPdfSheet';
 import { VisualDiagramCard } from './VisualDiagramCard';
 import { ExamModelsView } from './ExamModelsView';
+import { BibliographyView } from './BibliographyView';
 import { exportBlocksToPdf } from '../utils/exportPdf';
 
 type SummarySectionTarget = 'all' | 'concepts' | 'visuals' | 'formulas' | 'traps';
@@ -29,6 +37,8 @@ interface ExamSummaryViewProps {
   onAddExamModel: (model: ExamModel) => void;
   onSaveExamAttempt: (modelId: string, attempt: ExamAttemptResult) => void;
   onDeleteExamModel: (modelId: string) => void;
+  onAddBibliographyEntry: (entry: BibliographyEntry) => void;
+  onDeleteBibliographyEntry: (entryId: string) => void;
   readingMode?: boolean;
   onToggleReadingMode?: () => void;
   nightMode?: boolean;
@@ -42,6 +52,8 @@ export function ExamSummaryView({
   onAddExamModel,
   onSaveExamAttempt,
   onDeleteExamModel,
+  onAddBibliographyEntry,
+  onDeleteBibliographyEntry,
   readingMode: controlledReadingMode,
   onToggleReadingMode,
   nightMode: controlledNightMode,
@@ -52,6 +64,7 @@ export function ExamSummaryView({
   const [highlightedSection, setHighlightedSection] = useState<SummarySectionTarget | null>(null);
   const [revealedFormulaIds, setRevealedFormulaIds] = useState<string[]>([]);
   const [showExamModels, setShowExamModels] = useState(false);
+  const [showBibliography, setShowBibliography] = useState(false);
   const [localReadingMode, setLocalReadingMode] = useState(false);
   const [localNightMode, setLocalNightMode] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -69,6 +82,7 @@ export function ExamSummaryView({
     setHighlightedSection(null);
     setRevealedFormulaIds([]);
     setShowExamModels(false);
+    setShowBibliography(false);
   }, [plan.id]);
 
   useEffect(() => {
@@ -201,6 +215,19 @@ export function ExamSummaryView({
         onAddExamModel={onAddExamModel}
         onSaveAttempt={onSaveExamAttempt}
         onDeleteExamModel={onDeleteExamModel}
+        isReadingMode={isReadingMode}
+        isNightMode={isNightMode}
+      />
+    );
+  }
+
+  if (showBibliography) {
+    return (
+      <BibliographyView
+        plan={plan}
+        onBackToSummary={() => setShowBibliography(false)}
+        onAddBibliographyEntry={onAddBibliographyEntry}
+        onDeleteBibliographyEntry={onDeleteBibliographyEntry}
         isReadingMode={isReadingMode}
         isNightMode={isNightMode}
       />
@@ -410,11 +437,32 @@ export function ExamSummaryView({
             {/* Separate Blue CTA Button: Ejemplos de parciales */}
             <button
               type="button"
-              onClick={() => setShowExamModels(true)}
+              onClick={() => {
+                setShowBibliography(false);
+                setShowExamModels(true);
+              }}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 font-sans shadow-xs"
             >
               <ClipboardCheck className="w-3.5 h-3.5 shrink-0" />
               <span>Ejemplos de parciales</span>
+            </button>
+
+            {/* Help Bibliography CTA right beside Ejemplos de parciales */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowExamModels(false);
+                setShowBibliography(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 font-sans shadow-xs"
+            >
+              <Library className="w-3.5 h-3.5 shrink-0" />
+              <span>Bibliografía de ayuda</span>
+              {(plan.bibliography?.length ?? 0) > 0 && (
+                <span className="font-mono tabular-nums text-[11px] text-blue-100">
+                  ({plan.bibliography?.length})
+                </span>
+              )}
             </button>
           </div>
         </div>

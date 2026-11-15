@@ -278,6 +278,32 @@ export interface ExamModel {
   latestAttempt?: ExamAttemptResult;
 }
 
+export interface BibliographyRelevantSection {
+  sectionTitle: string;
+  pageOrLocationHint?: string;
+  whyRelevant: string;
+  keyTakeaways: string[];
+}
+
+export interface BibliographyAnalysisResult {
+  analyzedAt: string;
+  focusPrompt: string;
+  summary: string;
+  relevantSections: BibliographyRelevantSection[];
+  discardOrSkip: string[];
+  studyRecommendations: string[];
+}
+
+export interface BibliographyEntry {
+  id: string;
+  title: string;
+  createdAt: string;
+  focusPrompt: string;
+  fileNames: string[];
+  notesPreview?: string;
+  analysis: BibliographyAnalysisResult;
+}
+
 export interface StudyPlan {
   id: string;
   subject: string;
@@ -294,9 +320,11 @@ export interface StudyPlan {
   pace: 'Intensivo' | 'Equilibrado' | 'Profundo';
   executiveSummary: string;
   summarySections?: SummarySection[];
+  summaryUpdatedAt?: string;
   visualExamples?: VisualExample[];
   adaptiveSummary?: AdaptiveExamSummary;
   examModels?: ExamModel[];
+  bibliography?: BibliographyEntry[];
   studyBlocks: StudyBlock[];
   keyConcepts: KeyConcept[];
   formulas: FormulaItem[];
@@ -305,6 +333,8 @@ export interface StudyPlan {
   masteryChecklist: MasteryCheckItem[];
   quizQuestions: QuizQuestion[];
   exercises: StepByStepExercise[];
+  exercisesSyncedAt?: string;
+  exercisesSourceLabel?: string;
 }
 
 export interface UploadedFilePayload {

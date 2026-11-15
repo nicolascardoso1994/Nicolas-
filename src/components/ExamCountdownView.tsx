@@ -11,7 +11,8 @@ import {
   Moon,
 } from 'lucide-react';
 import { AdaptiveExamSummary, ExamReminderConfig, ExamUrgencyTier, StudyPlan } from '../types/study';
-import { MathBlock, MathText } from './MathText';
+import { MathText } from './MathText';
+import { RevealableFormula } from './RevealableFormula';
 import { VisualDiagramCard } from './VisualDiagramCard';
 import { ExamReminderSettings } from './ExamReminderSettings';
 
@@ -111,6 +112,7 @@ export function ExamCountdownView({
   const [loadingTimeAdvice, setLoadingTimeAdvice] = useState<boolean>(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [revealedFormulaIndices, setRevealedFormulaIndices] = useState<number[]>([]);
   const [localReadingMode, setLocalReadingMode] = useState(false);
   const [localNightMode, setLocalNightMode] = useState(false);
 
@@ -671,36 +673,14 @@ export function ExamCountdownView({
                       <MathText text={sec.content} />
                     </p>
                     {sec.formulaLatex && (
-                      <div
-                        className={`my-3 border rounded-lg px-4 py-3 space-y-1 ${
-                          isNightMode
-                            ? 'bg-[#1F2838] border-[#313F57]'
-                            : isReadingMode
-                              ? 'bg-[#F2ECDC] border-[#DFD6BF]'
-                              : 'bg-slate-50 border-slate-200'
-                        }`}
-                      >
-                        <div
-                          className={`overflow-x-auto text-center ${
-                            isNightMode ? 'text-[#F8FAFC]' : ''
-                          }`}
-                        >
-                          <MathBlock latex={sec.formulaLatex} displayMode={true} bold={true} />
-                        </div>
-                        {sec.formulaCaption && (
-                          <p
-                            className={`text-xs text-center ${
-                              isNightMode
-                                ? 'text-[#94A3B8]'
-                                : isReadingMode
-                                  ? 'text-[#6E6254]'
-                                  : 'text-slate-500'
-                            }`}
-                          >
-                            {sec.formulaCaption}
-                          </p>
-                        )}
-                      </div>
+                      <RevealableFormula
+                        key={`${plan.id}-adaptive-sec-${sec.order}`}
+                        latex={sec.formulaLatex}
+                        caption={sec.formulaCaption}
+                        bold={true}
+                        isReadingMode={isReadingMode}
+                        isNightMode={isNightMode}
+                      />
                     )}
                   </article>
                 ))}
@@ -829,7 +809,7 @@ export function ExamCountdownView({
                 }`}
               >
                 <div
-                  className={`px-5 py-4 border-b ${
+                  className={`px-5 py-4 border-b flex items-start justify-between gap-3 ${
                     isNightMode
                       ? 'border-[#253042]'
                       : isReadingMode
@@ -837,28 +817,56 @@ export function ExamCountdownView({
                         : 'border-slate-200'
                   }`}
                 >
-                  <h3
-                    className={`text-base font-semibold ${
+                  <div>
+                    <h3
+                      className={`text-base font-semibold ${
+                        isNightMode
+                          ? 'text-white'
+                          : isReadingMode
+                            ? 'text-[#241E18]'
+                            : 'text-slate-900'
+                      }`}
+                    >
+                      Fórmulas clave para memorizar
+                    </h3>
+                    <p
+                      className={`text-xs ${
+                        isNightMode
+                          ? 'text-[#94A3B8]'
+                          : isReadingMode
+                            ? 'text-[#6E6254]'
+                            : 'text-slate-500'
+                      }`}
+                    >
+                      Lo mínimo indispensable que tenés que saber de memoria o deducir rápido.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allOpen =
+                        summary.mustMemorizeFormulas.length > 0 &&
+                        summary.mustMemorizeFormulas.every((_, i) =>
+                          revealedFormulaIndices.includes(i)
+                        );
+                      setRevealedFormulaIndices(
+                        allOpen ? [] : summary.mustMemorizeFormulas.map((_, i) => i)
+                      );
+                    }}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors font-sans whitespace-nowrap shrink-0 ${
                       isNightMode
-                        ? 'text-white'
+                        ? 'border-[#313F57] text-[#93C5FD] hover:bg-[#1F2838]'
                         : isReadingMode
-                          ? 'text-[#241E18]'
-                          : 'text-slate-900'
+                          ? 'border-[#DFD6BF] text-[#8B5220] hover:bg-[#F2ECDC]'
+                          : 'border-slate-200 bg-white text-blue-700 hover:bg-blue-50'
                     }`}
                   >
-                    Fórmulas clave para memorizar
-                  </h3>
-                  <p
-                    className={`text-xs ${
-                      isNightMode
-                        ? 'text-[#94A3B8]'
-                        : isReadingMode
-                          ? 'text-[#6E6254]'
-                          : 'text-slate-500'
-                    }`}
-                  >
-                    Lo mínimo indispensable que tenés que saber de memoria o deducir rápido.
-                  </p>
+                    {summary.mustMemorizeFormulas.every((_, i) =>
+                      revealedFormulaIndices.includes(i)
+                    )
+                      ? 'Ocultar todas'
+                      : 'Ver todas'}
+                  </button>
                 </div>
                 <div
                   className={`divide-y ${
@@ -882,17 +890,20 @@ export function ExamCountdownView({
                       >
                         {f.name}
                       </h4>
-                      <div
-                        className={`border rounded-lg px-3 py-2.5 overflow-x-auto text-center ${
-                          isNightMode
-                            ? 'bg-[#1F2838] border-[#313F57] text-white'
-                            : isReadingMode
-                              ? 'bg-[#F2ECDC] border-[#DFD6BF] text-[#241E18]'
-                              : 'bg-slate-50 border-slate-200 text-slate-950'
-                        }`}
-                      >
-                        <MathBlock latex={f.latex} displayMode={true} bold={true} />
-                      </div>
+                      <RevealableFormula
+                        latex={f.latex}
+                        bold={true}
+                        open={revealedFormulaIndices.includes(idx)}
+                        onToggle={() =>
+                          setRevealedFormulaIndices((prev) =>
+                            prev.includes(idx)
+                              ? prev.filter((i) => i !== idx)
+                              : [...prev, idx]
+                          )
+                        }
+                        isReadingMode={isReadingMode}
+                        isNightMode={isNightMode}
+                      />
                       <p
                         className={`text-xs leading-relaxed ${
                           isNightMode

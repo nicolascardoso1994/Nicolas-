@@ -12,7 +12,8 @@ import {
   List,
 } from 'lucide-react';
 import { StudyPlan, StudyTab } from '../types/study';
-import { MathBlock, MathText } from './MathText';
+import { MathText } from './MathText';
+import { RevealableFormula } from './RevealableFormula';
 
 interface SummariesLibraryViewProps {
   plans: StudyPlan[];
@@ -439,9 +440,12 @@ export function SummariesLibraryView({
                             <MathText text={sec.content} />
                           </p>
                           {sec.formulaLatex && (
-                            <div className="bg-white border border-slate-200 rounded px-3 py-2 overflow-x-auto text-center">
-                              <MathBlock latex={sec.formulaLatex} displayMode={true} bold={true} />
-                            </div>
+                            <RevealableFormula
+                              key={`${plan.id}-lib-sec-${sec.order}`}
+                              latex={sec.formulaLatex}
+                              compact={true}
+                              bold={true}
+                            />
                           )}
                         </div>
                       ))

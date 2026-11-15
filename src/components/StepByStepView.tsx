@@ -18,7 +18,8 @@ import {
   StudyPlan,
   UploadedFilePayload,
 } from '../types/study';
-import { MathBlock, MathText } from './MathText';
+import { MathText } from './MathText';
+import { RevealableFormula } from './RevealableFormula';
 import { PhysicsVisualizer } from './PhysicsVisualizer';
 
 interface StepByStepViewProps {
@@ -599,9 +600,12 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
 
                   {/* Math Formula */}
                   {step.mathLatex && step.mathLatex.trim().length > 0 && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3.5 overflow-x-auto text-slate-900">
-                      <MathBlock latex={step.mathLatex} displayMode={true} />
-                    </div>
+                    <RevealableFormula
+                      key={`${activeExercise?.id ?? 'ex'}-${step.stepNumber}`}
+                      latex={step.mathLatex}
+                      label="Ver fórmula"
+                      bold={false}
+                    />
                   )}
 
                   {/* Concrete Explanation */}

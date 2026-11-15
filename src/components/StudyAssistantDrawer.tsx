@@ -10,7 +10,8 @@ import {
   Wand2,
 } from 'lucide-react';
 import { AssistantMessage, StudyPlan, SummarySection } from '../types/study';
-import { MathBlock, MathText } from './MathText';
+import { MathText } from './MathText';
+import { RevealableFormula } from './RevealableFormula';
 
 interface StudyAssistantDrawerProps {
   open: boolean;
@@ -471,15 +472,13 @@ export function StudyAssistantDrawer({
                                   <MathText text={sec.content} />
                                 </p>
                                 {sec.formulaLatex && (
-                                  <div
-                                    className={`border rounded px-2.5 py-2 overflow-x-auto text-center ${
-                                      nightMode
-                                        ? 'bg-[#1D2637] border-[#313F57] text-[#F8FAFC]'
-                                        : 'bg-slate-50 border-slate-200'
-                                    }`}
-                                  >
-                                    <MathBlock latex={sec.formulaLatex} displayMode={true} bold={true} />
-                                  </div>
+                                  <RevealableFormula
+                                    latex={sec.formulaLatex}
+                                    compact={true}
+                                    bold={true}
+                                    isReadingMode={readingMode}
+                                    isNightMode={nightMode}
+                                  />
                                 )}
                               </div>
                             ))}

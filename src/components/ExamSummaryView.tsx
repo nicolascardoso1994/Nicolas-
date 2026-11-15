@@ -13,7 +13,8 @@ import {
   Eye,
 } from 'lucide-react';
 import { StudyPlan, StudyTab } from '../types/study';
-import { MathBlock, MathText } from './MathText';
+import { MathText } from './MathText';
+import { RevealableFormula } from './RevealableFormula';
 import { SummaryPdfSheet } from './SummaryPdfSheet';
 import { VisualDiagramCard } from './VisualDiagramCard';
 import { exportBlocksToPdf } from '../utils/exportPdf';
@@ -41,6 +42,7 @@ export function ExamSummaryView({
 }: ExamSummaryViewProps) {
   const [activeSection, setActiveSection] = useState<SummarySectionTarget>('all');
   const [highlightedSection, setHighlightedSection] = useState<SummarySectionTarget | null>(null);
+  const [revealedFormulaIds, setRevealedFormulaIds] = useState<string[]>([]);
   const [localReadingMode, setLocalReadingMode] = useState(false);
   const [localNightMode, setLocalNightMode] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -56,6 +58,7 @@ export function ExamSummaryView({
   useEffect(() => {
     setActiveSection('all');
     setHighlightedSection(null);
+    setRevealedFormulaIds([]);
   }, [plan.id]);
 
   useEffect(() => {
@@ -428,16 +431,14 @@ export function ExamSummaryView({
                   <MathText text={sec.content} />
                 </p>
                 {sec.formulaLatex && (
-                  <div className={`my-3 border rounded-lg px-4 py-3 space-y-1 ${innerPaper}`}>
-                    <div className={`overflow-x-auto text-center ${headingInk}`}>
-                      <MathBlock latex={sec.formulaLatex} displayMode={true} bold={true} />
-                    </div>
-                    {sec.formulaCaption && (
-                      <p className={`text-xs text-center ${mutedInk}`}>
-                        {sec.formulaCaption}
-                      </p>
-                    )}
-                  </div>
+                  <RevealableFormula
+                    key={`${plan.id}-sec-${sec.order}`}
+                    latex={sec.formulaLatex}
+                    caption={sec.formulaCaption}
+                    bold={true}
+                    isReadingMode={isReadingMode}
+                    isNightMode={isNightMode}
+                  />
                 )}
               </article>
             ))}
@@ -623,10 +624,32 @@ export function ExamSummaryView({
                 Formulario y relaciones críticas
               </h3>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <span className={`text-xs tabular-nums ${mutedInk}`}>
                 {plan.formulas.length} ecuaciones
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  const allRevealed =
+                    plan.formulas.length > 0 &&
+                    plan.formulas.every((f) => revealedFormulaIds.includes(f.id));
+                  setRevealedFormulaIds(
+                    allRevealed ? [] : plan.formulas.map((f) => f.id)
+                  );
+                }}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors font-sans whitespace-nowrap shrink-0 ${
+                  isNightMode
+                    ? 'border-[#313F57] text-[#93C5FD] hover:bg-[#1F2838]'
+                    : isReadingMode
+                      ? 'border-[#DFD6BF] text-[#8B5220] hover:bg-[#F2ECDC]'
+                      : 'border-slate-200 bg-white text-blue-700 hover:bg-blue-50'
+                }`}
+              >
+                {plan.formulas.every((f) => revealedFormulaIds.includes(f.id))
+                  ? 'Ocultar todas'
+                  : 'Ver todas'}
+              </button>
               <button
                 type="button"
                 onClick={() => handleJumpToSection('all')}
@@ -650,17 +673,20 @@ export function ExamSummaryView({
                   </h4>
                 </div>
 
-                <div
-                  className={`border rounded-lg px-4 py-3 overflow-x-auto text-center ${
-                    isNightMode
-                      ? 'bg-[#1F2838] border-[#313F57] text-white'
-                      : isReadingMode
-                        ? 'bg-[#F2ECDC] border-[#DFD6BF] text-[#241E18]'
-                        : 'bg-slate-50 border-slate-200 text-slate-950'
-                  }`}
-                >
-                  <MathBlock latex={formula.latex} displayMode={true} bold={true} />
-                </div>
+                <RevealableFormula
+                  latex={formula.latex}
+                  bold={true}
+                  open={revealedFormulaIds.includes(formula.id)}
+                  onToggle={() =>
+                    setRevealedFormulaIds((prev) =>
+                      prev.includes(formula.id)
+                        ? prev.filter((id) => id !== formula.id)
+                        : [...prev, formula.id]
+                    )
+                  }
+                  isReadingMode={isReadingMode}
+                  isNightMode={isNightMode}
+                />
 
                 <p className={`text-xs leading-relaxed ${mutedInk}`}>
                   <strong className={headingInk}>Variables:</strong>{' '}

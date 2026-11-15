@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Loader2, Upload, X, FileText } from 'lucide-react';
 import { StudyPlan, UploadedFilePayload } from '../types/study';
 import { DEFAULT_REMINDER_CONFIG, addDaysToLocalDate } from '../utils/examReminders';
+import { readValidatedFilePayload, safeFetchJson } from '../utils/apiClient';
 
 interface NewPlanModalProps {
   open: boolean;
@@ -55,42 +56,6 @@ const PRESET_TEMPLATES = [
   },
 ];
 
-function readFile(file: File): Promise<UploadedFilePayload> {
-  return new Promise((resolve, reject) => {
-    const isText =
-      file.type.startsWith('text/') ||
-      file.name.endsWith('.md') ||
-      file.name.endsWith('.txt') ||
-      file.name.endsWith('.csv');
-
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}`));
-
-    if (isText) {
-      reader.onload = () => {
-        resolve({
-          name: file.name,
-          mimeType: file.type || 'text/plain',
-          base64Data: '',
-          textContent: typeof reader.result === 'string' ? reader.result : '',
-        });
-      };
-      reader.readAsText(file);
-    } else {
-      reader.onload = () => {
-        const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-        const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-        resolve({
-          name: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          base64Data,
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  });
-}
-
 export function NewPlanModal({ open, onClose, onCreated }: NewPlanModalProps) {
   const [subject, setSubject] = useState('');
   const [folder, setFolder] = useState('General');
@@ -125,7 +90,9 @@ export function NewPlanModal({ open, onClose, onCreated }: NewPlanModalProps) {
     if (!fileList) return;
     setError(null);
     try {
-      const parsed = await Promise.all(Array.from(fileList).slice(0, 4).map(readFile));
+      const parsed = await Promise.all(
+        Array.from(fileList).slice(0, 4).map(readValidatedFilePayload)
+      );
       setFiles((prev) => [...prev, ...parsed].slice(0, 4));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al procesar los archivos.');
@@ -142,9 +109,8 @@ export function NewPlanModal({ open, onClose, onCreated }: NewPlanModalProps) {
 
     setLoading(true);
     try {
-      const response = await fetch('/api/study-plan', {
+      const data = await safeFetchJson<StudyPlan>('/api/study-plan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: subject.trim(),
           examType,
@@ -156,10 +122,6 @@ export function NewPlanModal({ open, onClose, onCreated }: NewPlanModalProps) {
           files,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo generar el plan de estudio.');
-      }
       const resolvedFolder =
         folder === '__custom__' ? customFolder.trim() || 'General' : folder;
       onCreated({

@@ -15,6 +15,7 @@ import { MathText } from './MathText';
 import { RevealableFormula } from './RevealableFormula';
 import { VisualDiagramCard } from './VisualDiagramCard';
 import { ExamReminderSettings } from './ExamReminderSettings';
+import { safeFetchJson } from '../utils/apiClient';
 
 interface ExamCountdownViewProps {
   plan: StudyPlan;
@@ -165,9 +166,8 @@ export function ExamCountdownView({
     setError(null);
     setLoading(true);
     try {
-      const response = await fetch('/api/adaptive-exam-summary', {
+      const data = await safeFetchJson<AdaptiveExamSummary>('/api/adaptive-exam-summary', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: plan.subject,
           examType: plan.examType,
@@ -181,11 +181,8 @@ export function ExamCountdownView({
           examTraps: plan.examTraps,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo generar el resumen adaptado.');
-      }
-      onSaveAdaptiveSummary(data, selectedDate);
+      const localExamDate = data.examDate || selectedDate || toLocalDateInputValue(new Date());
+      onSaveAdaptiveSummary({ ...data, examDate: localExamDate }, localExamDate);
       setShowTimeDistribution(includeTimeDistribution && Boolean(data.timeAllocationAdvice));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error de conexión con el servidor.');
@@ -210,9 +207,8 @@ export function ExamCountdownView({
     setError(null);
     setLoadingTimeAdvice(true);
     try {
-      const response = await fetch('/api/time-distribution', {
+      const data = await safeFetchJson<{ advice: string }>('/api/time-distribution', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: plan.subject,
           examType: plan.examType,
@@ -221,10 +217,6 @@ export function ExamCountdownView({
           priorityTopics: plan.adaptiveSummary.priorityTopics,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo calcular la distribución del tiempo.');
-      }
       onSaveAdaptiveSummary(
         {
           ...plan.adaptiveSummary,

@@ -253,6 +253,7 @@ export interface ExamAttemptQuestionResult {
   maxPoints: number;
   isCorrect: boolean;
   feedback: string;
+  correctIndex?: number;
 }
 
 export interface ExamAttemptResult {
@@ -272,6 +273,7 @@ export interface ExamModel {
   passingScore: number;
   createdAt: string;
   sourceNotes?: string;
+  gradingToken?: string;
   questions: ExamModelQuestion[];
   latestAttempt?: ExamAttemptResult;
 }

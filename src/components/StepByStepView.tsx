@@ -21,48 +21,12 @@ import {
 import { MathText } from './MathText';
 import { RevealableFormula } from './RevealableFormula';
 import { PhysicsVisualizer } from './PhysicsVisualizer';
+import { readValidatedFilePayload, safeFetchJson } from '../utils/apiClient';
 
 interface StepByStepViewProps {
   plan: StudyPlan;
   onAddExercise: (exercise: StepByStepExercise) => void;
   onOpenChart?: (dataset: ChartDataset) => void;
-}
-
-function readFileAsPayload(file: File): Promise<UploadedFilePayload> {
-  return new Promise((resolve, reject) => {
-    const isText =
-      file.type.startsWith('text/') ||
-      file.name.endsWith('.md') ||
-      file.name.endsWith('.txt') ||
-      file.name.endsWith('.csv');
-
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}`));
-
-    if (isText) {
-      reader.onload = () => {
-        const textContent = typeof reader.result === 'string' ? reader.result : '';
-        resolve({
-          name: file.name,
-          mimeType: file.type || 'text/plain',
-          base64Data: '',
-          textContent,
-        });
-      };
-      reader.readAsText(file);
-    } else {
-      reader.onload = () => {
-        const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-        const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-        resolve({
-          name: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          base64Data,
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  });
 }
 
 export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepViewProps) {
@@ -97,8 +61,11 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
 
   const handleCustomFiles = async (fileList: FileList | null) => {
     if (!fileList) return;
+    setSolveError(null);
     try {
-      const loaded = await Promise.all(Array.from(fileList).slice(0, 3).map(readFileAsPayload));
+      const loaded = await Promise.all(
+        Array.from(fileList).slice(0, 3).map(readValidatedFilePayload)
+      );
       setCustomFiles((prev) => [...prev, ...loaded].slice(0, 3));
     } catch (err) {
       setSolveError(err instanceof Error ? err.message : 'Error al leer el archivo.');
@@ -115,19 +82,14 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
 
     setSolving(true);
     try {
-      const res = await fetch('/api/solve-exercise', {
+      const data = await safeFetchJson<StepByStepExercise>('/api/solve-exercise', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: plan.subject,
           statement: customStatement.trim(),
           files: customFiles,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'No se pudo generar la resolución.');
-      }
       onAddExercise(data);
       setSelectedExIdx(exercises.length);
       setCurrentStepIdx(0);
@@ -288,19 +250,22 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
                 }
 
                 setCharting(true);
+                setSolveError(null);
                 try {
-                  const res = await fetch('/api/generate-chart-data', {
+                  const data = await safeFetchJson<ChartDataset>('/api/generate-chart-data', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       subject: plan.subject,
                       promptText: `Generá una tabla de puntos para graficar la relación física o matemática principal de este ejercicio:\n${activeExercise.statement}`,
                     }),
                   });
-                  const data = await res.json();
-                  if (res.ok && Array.isArray(data.series) && data.series.length > 0) {
+                  if (Array.isArray(data.series) && data.series.length > 0) {
                     onOpenChart(data);
                   }
+                } catch (err) {
+                  setSolveError(
+                    err instanceof Error ? err.message : 'No se pudo generar el gráfico del ejercicio.'
+                  );
                 } finally {
                   setCharting(false);
                 }

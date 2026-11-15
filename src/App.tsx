@@ -194,17 +194,21 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(plans));
-      localStorage.setItem(ACTIVE_ID_KEY, activePlanId);
-      localStorage.setItem(READING_MODE_KEY, String(readingMode));
-      localStorage.setItem(NIGHT_MODE_KEY, String(nightMode));
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
-      localStorage.setItem(READ_ALERTS_KEY, JSON.stringify(readAlertIds));
-      localStorage.setItem(NOTIFIED_BROWSER_KEY, JSON.stringify(notifiedBrowserKeys));
-    } catch {
-      // Ignore storage quota errors
-    }
+    const timer = window.setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(plans));
+        localStorage.setItem(ACTIVE_ID_KEY, activePlanId);
+        localStorage.setItem(READING_MODE_KEY, String(readingMode));
+        localStorage.setItem(NIGHT_MODE_KEY, String(nightMode));
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+        localStorage.setItem(READ_ALERTS_KEY, JSON.stringify(readAlertIds));
+        localStorage.setItem(NOTIFIED_BROWSER_KEY, JSON.stringify(notifiedBrowserKeys));
+      } catch {
+        // Ignore storage quota errors
+      }
+    }, 400);
+
+    return () => window.clearTimeout(timer);
   }, [
     plans,
     activePlanId,

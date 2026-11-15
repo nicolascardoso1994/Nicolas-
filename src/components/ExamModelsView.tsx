@@ -21,6 +21,7 @@ import {
 } from '../types/study';
 import { MathText } from './MathText';
 import { RevealableFormula } from './RevealableFormula';
+import { readValidatedFilePayload, safeFetchJson } from '../utils/apiClient';
 
 interface ExamModelsViewProps {
   plan: StudyPlan;
@@ -30,42 +31,6 @@ interface ExamModelsViewProps {
   onDeleteExamModel: (modelId: string) => void;
   isReadingMode?: boolean;
   isNightMode?: boolean;
-}
-
-function readUploadedExamFile(file: File): Promise<UploadedFilePayload> {
-  return new Promise((resolve, reject) => {
-    const isText =
-      file.type.startsWith('text/') ||
-      file.name.endsWith('.md') ||
-      file.name.endsWith('.txt') ||
-      file.name.endsWith('.csv');
-
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}`));
-
-    if (isText) {
-      reader.onload = () => {
-        resolve({
-          name: file.name,
-          mimeType: file.type || 'text/plain',
-          base64Data: '',
-          textContent: typeof reader.result === 'string' ? reader.result : '',
-        });
-      };
-      reader.readAsText(file);
-    } else {
-      reader.onload = () => {
-        const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-        const base64Data = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-        resolve({
-          name: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          base64Data,
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  });
 }
 
 export function ExamModelsView({
@@ -164,7 +129,7 @@ export function ExamModelsView({
     setError(null);
     try {
       const parsed = await Promise.all(
-        Array.from(fileList).slice(0, 3).map(readUploadedExamFile)
+        Array.from(fileList).slice(0, 3).map(readValidatedFilePayload)
       );
       setUploadedFiles((prev) => [...prev, ...parsed].slice(0, 3));
     } catch (err) {
@@ -185,9 +150,8 @@ export function ExamModelsView({
 
     setGenerating(true);
     try {
-      const response = await fetch('/api/generate-exam-model', {
+      const data = await safeFetchJson<ExamModel>('/api/generate-exam-model', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: plan.subject,
           subjectMode: plan.subjectMode || 'quantitative',
@@ -204,10 +168,6 @@ export function ExamModelsView({
           difficultyFocus,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'No se pudo generar el modelo de parcial.');
-      }
       onAddExamModel(data);
       setSelectedModelId(data.id);
       setCreatorTab('none');
@@ -228,20 +188,16 @@ export function ExamModelsView({
     setError(null);
     setGrading(true);
     try {
-      const response = await fetch('/api/grade-exam-model', {
+      const result = await safeFetchJson<ExamAttemptResult>('/api/grade-exam-model', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: plan.subject,
           subjectMode: plan.subjectMode || 'quantitative',
-          examModel: activeModel,
+          examId: activeModel.id,
+          gradingToken: activeModel.gradingToken,
           answers: draftAnswers,
         }),
       });
-      const result: ExamAttemptResult & { error?: string } = await response.json();
-      if (!response.ok) {
-        throw new Error(result.error || 'No se pudo corregir el parcial.');
-      }
       onSaveAttempt(activeModel.id, result);
       setIsRetaking(false);
     } catch (err) {
@@ -732,7 +688,9 @@ export function ExamModelsView({
                     <div className="space-y-2">
                       {q.options.map((opt, oIdx) => {
                         const chosen = draftAnswers[q.id] === oIdx;
-                        const isRightOption = oIdx === q.correctIndex;
+                        const resolvedCorrectIndex = qResult?.correctIndex ?? q.correctIndex;
+                        const isRightOption =
+                          resolvedCorrectIndex !== undefined && oIdx === resolvedCorrectIndex;
 
                         let optionClass = isNightMode
                           ? 'bg-[#171E2B] border-[#313F57] text-[#E2E8F0] hover:border-blue-500'

@@ -1,5 +1,7 @@
 import dotenv from "dotenv";
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
@@ -11,20 +13,309 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = 3000;
+const MIN_QUESTION_POINTS = 5;
+
+let cachedAiClient: GoogleGenAI | null = null;
+let cachedAiApiKey: string | null = null;
 
 function getAiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("No se encontró GEMINI_API_KEY en el entorno del servidor.");
   }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
+  if (!cachedAiClient || cachedAiApiKey !== apiKey) {
+    cachedAiClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
       },
-    },
-  });
+    });
+    cachedAiApiKey = apiKey;
+  }
+  return cachedAiClient;
+}
+
+const FALLBACK_EXAM_HMAC_SECRET = randomBytes(32).toString("hex");
+
+function getExamSigningSecret(): string {
+  return (
+    process.env.EXAM_SIGNING_SECRET?.trim() ||
+    process.env.GEMINI_API_KEY?.trim() ||
+    FALLBACK_EXAM_HMAC_SECRET
+  );
+}
+
+interface AuthoritativeExamQuestion {
+  id: string;
+  number: number;
+  type: "choice" | "open";
+  points: number;
+  prompt: string;
+  correctIndex?: number;
+  modelSolution: string;
+  gradingCriteria: string;
+}
+
+interface SignedExamPayload {
+  v: 1;
+  examId: string;
+  passingScore: number;
+  questions: AuthoritativeExamQuestion[];
+}
+
+function signExamGradingToken(payload: SignedExamPayload): string {
+  const encodedPayload = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const signature = createHmac("sha256", getExamSigningSecret())
+    .update(encodedPayload)
+    .digest("base64url");
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifyExamGradingToken(token: unknown): SignedExamPayload | null {
+  if (typeof token !== "string" || !token.includes(".")) return null;
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [encodedPayload, providedSig] = parts;
+  if (!encodedPayload || !providedSig) return null;
+
+  const expectedSig = createHmac("sha256", getExamSigningSecret())
+    .update(encodedPayload)
+    .digest("base64url");
+
+  const providedBuf = Buffer.from(providedSig, "utf8");
+  const expectedBuf = Buffer.from(expectedSig, "utf8");
+  if (providedBuf.length !== expectedBuf.length || !timingSafeEqual(providedBuf, expectedBuf)) {
+    return null;
+  }
+
+  try {
+    const decoded = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+    if (
+      !decoded ||
+      decoded.v !== 1 ||
+      typeof decoded.examId !== "string" ||
+      !Array.isArray(decoded.questions) ||
+      decoded.questions.length === 0
+    ) {
+      return null;
+    }
+    return decoded as SignedExamPayload;
+  } catch {
+    return null;
+  }
+}
+
+const SAMPLE_EXAM_KEYS: Record<string, SignedExamPayload> = {
+  "sample-exam-fisica-1": {
+    v: 1,
+    examId: "sample-exam-fisica-1",
+    passingScore: 60,
+    questions: [
+      {
+        id: "fis-q1",
+        number: 1,
+        type: "choice",
+        points: 20,
+        prompt:
+          "Un bloque de masa $m$ descansa sobre un plano inclinado de ángulo $\\theta$ sin rozamiento mientras una fuerza horizontal $F$ lo empuja hacia el plano. ¿Qué expresión describe correctamente la fuerza Normal $N$?",
+        correctIndex: 0,
+        modelSolution:
+          "Al descomponer tanto el peso como la fuerza horizontal $F$ sobre el eje perpendicular al plano, ambas apuntan hacia la superficie, por lo que $N = mg\\cos(\\theta) + F\\sin(\\theta)$.",
+        gradingCriteria:
+          "Selección de la opción que suma la componente perpendicular de F al término mg cos(θ).",
+      },
+      {
+        id: "fis-q2",
+        number: 2,
+        type: "choice",
+        points: 20,
+        prompt:
+          "Un cuerpo de $4\\text{ kg}$ está en reposo sobre una mesa horizontal ($\\mu_e = 0.5$, $\\mu_d = 0.3$, $g = 9.8\\text{ m/s}^2$). Si se le aplica una fuerza horizontal de $12\\text{ N}$, ¿cuál es el valor de la fuerza de rozamiento?",
+        correctIndex: 0,
+        modelSolution:
+          "El tope estático es $f_{e,\\text{máx}} = 0.5 \\cdot 4 \\cdot 9.8 = 19.6\\text{ N}$. Como $12\\text{ N} < 19.6\\text{ N}$, el cuerpo no desliza y el rozamiento estático toma exactamente el valor necesario para equilibrar: $12\\text{ N}$.",
+        gradingCriteria:
+          "Comprender que el rozamiento estático es variable hasta f_e,máx y no vale μ_e·N automáticamente.",
+      },
+      {
+        id: "fis-q3",
+        number: 3,
+        type: "open",
+        points: 30,
+        prompt:
+          "Un bloque de $2\\text{ kg}$ parte del reposo desde una altura $h = 3\\text{ m}$ por una rampa lisa y luego recorre un tramo horizontal áspero de $5\\text{ m}$ hasta detenerse. Calculá el coeficiente de rozamiento dinámico $\\mu_d$ en el tramo horizontal (usá $g = 9.8\\text{ m/s}^2$).",
+        modelSolution:
+          "Aplicando $W_{FNC} = \\Delta K + \\Delta U$: parte del reposo y termina en reposo ($\\Delta K = 0$). La energía potencial inicial $mgh$ se disipa íntegramente por el trabajo del rozamiento $-\\mu_d m g d$. Despejando: $\\mu_d = h / d = 3 / 5 = 0.60$.",
+        gradingCriteria:
+          "15 pts por plantear correctamente el balance energético con trabajo negativo del rozamiento; 15 pts por despejar μ_d = 0.60.",
+      },
+      {
+        id: "fis-q4",
+        number: 4,
+        type: "open",
+        points: 30,
+        prompt:
+          "Dos bloques de masas $m_1 = 3\\text{ kg}$ (sobre mesa horizontal lisa) y $m_2 = 2\\text{ kg}$ (colgando verticalmente) están unidos por una cuerda ideal que pasa por una polea sin fricción. Determiná la aceleración del sistema y la tensión de la cuerda ($g = 9.8\\text{ m/s}^2$).",
+        modelSolution:
+          "Para el sistema completo, la fuerza neta motriz es el peso colgante $m_2 g = 19.6\\text{ N}$ y la masa total es $m_1 + m_2 = 5\\text{ kg}$. Entonces $a = 19.6 / 5 = 3.92\\text{ m/s}^2$. Luego, para $m_1$: $T = m_1 a = 3 \\cdot 3.92 = 11.76\\text{ N}$.",
+        gradingCriteria:
+          "15 pts por plantear las ecuaciones de Newton y hallar a = 3.92 m/s²; 15 pts por calcular T = 11.76 N (menor que m_2 g).",
+      },
+    ],
+  },
+  "sample-exam-math-1": {
+    v: 1,
+    examId: "sample-exam-math-1",
+    passingScore: 60,
+    questions: [
+      {
+        id: "mat-q1",
+        number: 1,
+        type: "choice",
+        points: 25,
+        prompt:
+          "¿Para qué valores de $p$ converge la integral impropia de primera especie $\\int_{1}^{\\infty} \\frac{1}{x^p}\\,dx$?",
+        correctIndex: 0,
+        modelSolution:
+          "La primitiva es $x^{1-p}/(1-p)$ para $p \\neq 1$ y $\\ln(x)$ para $p=1$; solo tiende a un límite finito en $\\infty$ cuando $1-p < 0$, es decir $p > 1$.",
+        gradingCriteria: "Identificar la condición estricta p > 1.",
+      },
+      {
+        id: "mat-q2",
+        number: 2,
+        type: "choice",
+        points: 25,
+        prompt:
+          "Si $\\lim_{n \\to \\infty} a_n = 0$, ¿qué podemos concluir con certeza sobre la serie $\\sum_{n=1}^{\\infty} a_n$?",
+        correctIndex: 0,
+        modelSolution:
+          "Que el término general tienda a cero es condición necesaria pero NO suficiente para que la serie converja, como muestra $\\sum 1/n$.",
+        gradingCriteria: "Distinguir condición necesaria de suficiente.",
+      },
+      {
+        id: "mat-q3",
+        number: 3,
+        type: "open",
+        points: 25,
+        prompt:
+          "Calculá la integral indefinida $\\int x e^{2x}\\,dx$ indicando claramente tu elección de $u$ y $dv$.",
+        modelSolution:
+          "Elegimos $u = x \\implies du = dx$ y $dv = e^{2x}dx \\implies v = \\frac{1}{2}e^{2x}$. Aplicando $uv - \\int v\\,du$ resulta $\\frac{x}{2}e^{2x} - \\frac{1}{4}e^{2x} + C$.",
+        gradingCriteria:
+          "10 pts por elegir u=x y dv=e^{2x}dx; 15 pts por integrar correctamente sin olvidar el factor 1/2 y + C.",
+      },
+      {
+        id: "mat-q4",
+        number: 4,
+        type: "open",
+        points: 25,
+        prompt:
+          "Determiná el radio de convergencia $R$ y analizá ambos extremos de $\\sum_{n=1}^{\\infty} \\frac{(x-2)^n}{n \\cdot 3^n}$.",
+        modelSolution:
+          "Por D’Alembert, $|x-2|/3 < 1 \\implies R = 3$ sobre $(-1, 5)$. En $x = 5$ queda $\\sum 1/n$ (diverge); en $x = -1$ queda $\\sum (-1)^n/n$ (converge por Leibniz). Intervalo: $[-1, 5)$.",
+        gradingCriteria: "15 pts por hallar R=3; 10 pts por justificar ambos extremos por separado.",
+      },
+    ],
+  },
+  "sample-exam-anat-1": {
+    v: 1,
+    examId: "sample-exam-anat-1",
+    passingScore: 60,
+    questions: [
+      {
+        id: "ana-q1",
+        number: 1,
+        type: "choice",
+        points: 25,
+        prompt:
+          "¿Qué válvula impide el reflujo de sangre desde el ventrículo izquierdo hacia la aurícula izquierda durante la sístole ventricular?",
+        correctIndex: 0,
+        modelSolution:
+          "La válvula mitral (bicúspide) comunica la aurícula izquierda con el ventrículo izquierdo y se cierra en la sístole ventricular para evitar el retroceso hacia la aurícula.",
+        gradingCriteria: "Identificar correctamente la válvula auriculoventricular izquierda (mitral).",
+      },
+      {
+        id: "ana-q2",
+        number: 2,
+        type: "choice",
+        points: 25,
+        prompt:
+          "En una neurona multipolar mielinizada, ¿en qué estructura anatómica se regenera el potencial de acción durante la conducción saltatoria?",
+        correctIndex: 0,
+        modelSolution:
+          "Los nódulos de Ranvier son los espacios sin mielina entre segmentos consecutivos donde se concentran los canales de sodio dependientes de voltaje.",
+        gradingCriteria: "Reconocer la función de los nódulos de Ranvier en la conducción saltatoria.",
+      },
+      {
+        id: "ana-q3",
+        number: 3,
+        type: "open",
+        points: 25,
+        prompt:
+          "Describí ordenadamente el recorrido de la sangre desde que ingresa desoxigenada a la aurícula derecha hasta que sale oxigenada por la arteria aorta, nombrando las cavidades y válvulas atravesadas.",
+        modelSolution:
+          "Aurícula derecha → válvula tricúspide → ventrículo derecho → válvula pulmonar → arteria pulmonar hacia pulmones (hematosis) → venas pulmonares → aurícula izquierda → válvula mitral → ventrículo izquierdo → válvula aórtica → arteria aorta.",
+        gradingCriteria:
+          "15 pts por la secuencia correcta de cavidades y vasos; 10 pts por nombrar correctamente las cuatro válvulas en orden.",
+      },
+      {
+        id: "ana-q4",
+        number: 4,
+        type: "open",
+        points: 25,
+        prompt:
+          "Explicá la diferencia estructural y funcional entre las dendritas y el axón, y por qué la pared del ventrículo izquierdo es más gruesa que la del ventrículo derecho.",
+        modelSolution:
+          "Las dendritas son múltiples, cortas y ramificadas, especializadas en recibir señales aferentes; el axón es una prolongación única que conduce el impulso eferente hacia los botones terminales. El ventrículo izquierdo tiene miocardio más grueso porque debe vencer la alta resistencia vascular de la circulación sistémica (mayor), a diferencia del circuito pulmonar de baja presión.",
+        gradingCriteria:
+          "12 pts por contrastar dendritas vs axón; 13 pts por relacionar el grosor del miocardio izquierdo con la presión sistémica.",
+      },
+    ],
+  },
+};
+
+function normalizeQuestionPointsTo100(
+  rawWeights: number[],
+  configuredFloor = MIN_QUESTION_POINTS
+): number[] {
+  const count = rawWeights.length;
+  if (count === 0) return [];
+
+  const floor = Math.max(1, Math.min(configuredFloor, Math.floor(100 / count)));
+  const safeWeights = rawWeights.map((w) => (Number.isFinite(w) && w > 0 ? w : 100 / count));
+  const weightSum = safeWeights.reduce((acc, w) => acc + w, 0);
+
+  const points = safeWeights.map((w) =>
+    Math.max(floor, Math.round((w / weightSum) * 100))
+  );
+
+  // Order indices by descending weight so round-robin adjustment preserves proportional balance
+  const indicesByWeightDesc = safeWeights
+    .map((w, idx) => ({ w, idx }))
+    .sort((a, b) => b.w - a.w)
+    .map((item) => item.idx);
+
+  let diff = 100 - points.reduce((acc, p) => acc + p, 0);
+  let cursor = 0;
+  let guard = 0;
+  const maxIterations = Math.max(200, count * 100);
+
+  while (diff !== 0 && guard < maxIterations) {
+    guard++;
+    const idx = indicesByWeightDesc[cursor % count];
+    if (diff > 0) {
+      points[idx] += 1;
+      diff -= 1;
+    } else if (points[idx] > floor) {
+      points[idx] -= 1;
+      diff += 1;
+    }
+    cursor += 1;
+  }
+
+  return points;
 }
 
 interface IncomingFile {
@@ -740,13 +1031,46 @@ const gradeExamSchema = {
 
 async function startServer() {
   const app = express();
+  app.set("trust proxy", 1);
   app.use(express.json({ limit: "25mb" }));
+
+  const geminiRateLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      error:
+        "Demasiadas solicitudes en poco tiempo (máximo 10 por minuto). Esperá unos segundos antes de volver a intentar.",
+    },
+  });
+
+  const requireAppAccessKey = (req: Request, res: Response, next: NextFunction) => {
+    const expectedKey = process.env.APP_ACCESS_KEY?.trim();
+    if (!expectedKey) {
+      return next();
+    }
+    const providedKey = req.header("x-app-key")?.trim() || "";
+    const expectedBuf = Buffer.from(expectedKey, "utf8");
+    const providedBuf = Buffer.from(providedKey, "utf8");
+    if (
+      providedBuf.length !== expectedBuf.length ||
+      !timingSafeEqual(providedBuf, expectedBuf)
+    ) {
+      return res.status(401).json({
+        error: "Clave de acceso de la aplicación requerida o inválida.",
+      });
+    }
+    return next();
+  };
+
+  const geminiGuard = [requireAppAccessKey, geminiRateLimiter];
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
   });
 
-  app.post("/api/study-plan", async (req, res) => {
+  app.post("/api/study-plan", ...geminiGuard, async (req, res) => {
     try {
       const {
         subject,
@@ -982,7 +1306,7 @@ INSTRUCCIONES ESTRICTAS:
     }
   });
 
-  app.post("/api/solve-exercise", async (req, res) => {
+  app.post("/api/solve-exercise", ...geminiGuard, async (req, res) => {
     try {
       const { subject = "Física Universitaria", statement = "", files = [] } = req.body ?? {};
       if ((!statement || String(statement).trim().length === 0) && (!Array.isArray(files) || files.length === 0)) {
@@ -1067,7 +1391,7 @@ REQUISITOS IMPORTANTES SEGÚN EL TIPO DE MATERIA:
     }
   });
 
-  app.post("/api/adaptive-exam-summary", async (req, res) => {
+  app.post("/api/adaptive-exam-summary", ...geminiGuard, async (req, res) => {
     try {
       const {
         subject = "Materia Universitaria",
@@ -1181,7 +1505,7 @@ INSTRUCCIONES DE FORMATO PARA LECTURA AMIGABLE:
 
       return res.json({
         tier,
-        examDate: examDate || new Date().toISOString().slice(0, 10),
+        examDate: typeof examDate === "string" ? examDate.trim() : "",
         daysRemaining: safeDays,
         hoursPerDay: safeHoursPerDay,
         totalEffectiveHours,
@@ -1213,7 +1537,7 @@ INSTRUCCIONES DE FORMATO PARA LECTURA AMIGABLE:
     }
   });
 
-  app.post("/api/time-distribution", async (req, res) => {
+  app.post("/api/time-distribution", ...geminiGuard, async (req, res) => {
     try {
       const {
         subject = "Materia Universitaria",
@@ -1265,7 +1589,7 @@ Escribí un consejo claro y concreto en 3 a 4 oraciones indicando exactamente cu
     }
   });
 
-  app.post("/api/generate-chart-data", async (req, res) => {
+  app.post("/api/generate-chart-data", ...geminiGuard, async (req, res) => {
     try {
       const { subject = "Ciencias", promptText = "", files = [] } = req.body ?? {};
       if ((!promptText || String(promptText).trim().length === 0) && (!Array.isArray(files) || files.length === 0)) {
@@ -1339,7 +1663,7 @@ REQUISITOS:
     }
   });
 
-  app.post("/api/study-assistant", async (req, res) => {
+  app.post("/api/study-assistant", ...geminiGuard, async (req, res) => {
     try {
       const {
         mode = "ask",
@@ -1466,7 +1790,7 @@ INSTRUCCIONES:
     }
   });
 
-  app.post("/api/generate-exam-model", async (req, res) => {
+  app.post("/api/generate-exam-model", ...geminiGuard, async (req, res) => {
     try {
       const {
         subject = "Materia Universitaria",
@@ -1591,52 +1915,72 @@ REQUISITOS DEL PARCIAL:
 
       const parsed = JSON.parse((response.text ?? "{}").trim());
       const rawQuestions = Array.isArray(parsed.questions) ? parsed.questions : [];
-      const rawSum = rawQuestions.reduce(
-        (acc: number, q: Record<string, unknown>) => acc + (Number(q.points) || 0),
-        0
+      const exactPoints = normalizeQuestionPointsTo100(
+        rawQuestions.map((q: Record<string, unknown>) => Number(q.points) || 0),
+        MIN_QUESTION_POINTS
       );
 
-      const questions = rawQuestions.map((q: Record<string, unknown>, idx: number) => {
-        const type = q.type === "choice" && Array.isArray(q.options) && q.options.length >= 2
-          ? "choice"
-          : "open";
-        const basePoints = Number(q.points) || Math.round(100 / Math.max(1, rawQuestions.length));
-        const normalizedPoints =
-          rawSum > 0 ? Math.max(5, Math.round((basePoints / rawSum) * 100)) : 25;
+      const examId = `exam-model-${Date.now()}`;
+      const passingScore = 60;
 
+      const authoritativeQuestions: AuthoritativeExamQuestion[] = rawQuestions.map(
+        (q: Record<string, unknown>, idx: number) => {
+          const type =
+            q.type === "choice" && Array.isArray(q.options) && q.options.length >= 2
+              ? "choice"
+              : "open";
+          return {
+            id: `q-${Date.now()}-${idx + 1}`,
+            number: Number(q.number) || idx + 1,
+            type,
+            points: exactPoints[idx] ?? MIN_QUESTION_POINTS,
+            prompt: String(q.prompt ?? ""),
+            correctIndex:
+              type === "choice"
+                ? Math.max(
+                    0,
+                    Math.min(
+                      (Array.isArray(q.options) ? q.options.length : 4) - 1,
+                      Number(q.correctIndex) || 0
+                    )
+                  )
+                : undefined,
+            modelSolution: String(q.modelSolution ?? ""),
+            gradingCriteria: String(q.gradingCriteria ?? ""),
+          };
+        }
+      );
+
+      const gradingToken = signExamGradingToken({
+        v: 1,
+        examId,
+        passingScore,
+        questions: authoritativeQuestions,
+      });
+
+      // Omit correctIndex from ungraded client questions; post-grading returns it per questionResult
+      const clientQuestions = rawQuestions.map((q: Record<string, unknown>, idx: number) => {
+        const authQ = authoritativeQuestions[idx];
         return {
-          id: `q-${Date.now()}-${idx + 1}`,
-          number: Number(q.number) || idx + 1,
-          type,
+          id: authQ.id,
+          number: authQ.number,
+          type: authQ.type,
           topic: String(q.topic ?? subject),
-          points: normalizedPoints,
-          prompt: String(q.prompt ?? ""),
+          points: authQ.points,
+          prompt: authQ.prompt,
           options:
-            type === "choice" && Array.isArray(q.options)
+            authQ.type === "choice" && Array.isArray(q.options)
               ? q.options.map((o) => String(o))
               : undefined,
-          correctIndex:
-            type === "choice"
-              ? Math.max(0, Math.min((Array.isArray(q.options) ? q.options.length : 4) - 1, Number(q.correctIndex) || 0))
-              : undefined,
-          modelSolution: String(q.modelSolution ?? ""),
+          modelSolution: authQ.modelSolution,
           modelFormulaLatex:
             !isTheoretical && q.modelFormulaLatex ? String(q.modelFormulaLatex) : undefined,
-          gradingCriteria: String(q.gradingCriteria ?? ""),
+          gradingCriteria: authQ.gradingCriteria,
         };
       });
 
-      // Ensure exact sum = 100
-      if (questions.length > 0) {
-        const currentTotal = questions.reduce((acc: number, q: { points: number }) => acc + q.points, 0);
-        questions[questions.length - 1].points = Math.max(
-          5,
-          questions[questions.length - 1].points + (100 - currentTotal)
-        );
-      }
-
       return res.json({
-        id: `exam-model-${Date.now()}`,
+        id: examId,
         title: String(
           customTitle?.trim() ||
             parsed.title ||
@@ -1644,10 +1988,11 @@ REQUISITOS DEL PARCIAL:
         ),
         source: isUploadMode ? "uploaded" : "generated",
         examType,
-        passingScore: 60,
+        passingScore,
         createdAt: new Date().toISOString(),
         sourceNotes: isUploadMode && uploadedText ? String(uploadedText).slice(0, 1000) : undefined,
-        questions,
+        gradingToken,
+        questions: clientQuestions,
       });
     } catch (err) {
       const { status, message } = extractGeminiError(err);
@@ -1655,31 +2000,38 @@ REQUISITOS DEL PARCIAL:
     }
   });
 
-  app.post("/api/grade-exam-model", async (req, res) => {
+  app.post("/api/grade-exam-model", ...geminiGuard, async (req, res) => {
     try {
       const {
         subject = "Materia Universitaria",
         subjectMode = "quantitative",
-        examModel,
+        examId,
+        gradingToken,
         answers = {},
       } = req.body ?? {};
 
-      if (!examModel || !Array.isArray(examModel.questions) || examModel.questions.length === 0) {
-        return res.status(400).json({ error: "No se encontró un modelo de parcial válido para evaluar." });
+      const verifiedPayload =
+        verifyExamGradingToken(gradingToken) ??
+        (typeof examId === "string" ? SAMPLE_EXAM_KEYS[examId] ?? null : null);
+
+      if (!verifiedPayload) {
+        return res.status(403).json({
+          error:
+            "El token de verificación del parcial no es válido o falta. Generá un nuevo modelo de parcial para evaluarlo de forma segura.",
+        });
       }
 
-      const questions = examModel.questions as Array<{
-        id: string;
-        number: number;
-        type: "choice" | "open";
-        topic: string;
-        points: number;
-        prompt: string;
-        options?: string[];
-        correctIndex?: number;
-        modelSolution: string;
-        gradingCriteria: string;
-      }>;
+      if (typeof examId === "string" && verifiedPayload.examId !== examId) {
+        return res.status(403).json({
+          error: "El token de verificación no corresponde al modelo de parcial enviado.",
+        });
+      }
+
+      const questions = verifiedPayload.questions;
+      const safeAnswers =
+        answers && typeof answers === "object" && !Array.isArray(answers)
+          ? (answers as Record<string, unknown>)
+          : {};
 
       const choiceResults: Array<{
         questionId: string;
@@ -1687,6 +2039,7 @@ REQUISITOS DEL PARCIAL:
         maxPoints: number;
         isCorrect: boolean;
         feedback: string;
+        correctIndex?: number;
       }> = [];
 
       const openToEvaluate: Array<{
@@ -1708,16 +2061,18 @@ REQUISITOS DEL PARCIAL:
       }> = [];
 
       for (const q of questions) {
-        const rawAns = answers[q.id];
+        const rawAns = safeAnswers[q.id];
         if (q.type === "choice") {
           const chosen = typeof rawAns === "number" ? rawAns : Number(rawAns);
-          const hasChosen = Number.isFinite(chosen) && rawAns !== "" && rawAns !== undefined && rawAns !== null;
+          const hasChosen =
+            Number.isFinite(chosen) && rawAns !== "" && rawAns !== undefined && rawAns !== null;
           const isCorrect = hasChosen && chosen === q.correctIndex;
           choiceResults.push({
             questionId: q.id,
             earnedPoints: isCorrect ? q.points : 0,
             maxPoints: q.points,
             isCorrect,
+            correctIndex: q.correctIndex,
             feedback: !hasChosen
               ? "No seleccionaste ninguna opción."
               : isCorrect
@@ -1742,7 +2097,7 @@ REQUISITOS DEL PARCIAL:
               prompt: q.prompt,
               modelSolution: q.modelSolution,
               gradingCriteria: q.gradingCriteria,
-              studentAnswer: textAns,
+              studentAnswer: textAns.slice(0, 8000),
             });
           }
         }
@@ -1831,6 +2186,7 @@ INSTRUCCIONES DE CORRECCIÓN:
         maxPoints: number;
         isCorrect: boolean;
         feedback: string;
+        correctIndex?: number;
       }>();
       for (const r of [...choiceResults, ...blankOpenResults, ...openAiResults]) {
         resultById.set(r.questionId, r);
@@ -1844,6 +2200,7 @@ INSTRUCCIONES DE CORRECCIÓN:
             maxPoints: q.points,
             isCorrect: false,
             feedback: "Sin respuesta evaluada.",
+            ...(q.type === "choice" ? { correctIndex: q.correctIndex } : {}),
           }
       );
 
@@ -1854,7 +2211,7 @@ INSTRUCCIONES DE CORRECCIÓN:
           questionResults.reduce((acc, r) => acc + r.earnedPoints, 0)
         )
       );
-      const passingScore = Number(examModel.passingScore) || 60;
+      const passingScore = Number(verifiedPayload.passingScore) || 60;
       const passed = totalScore >= passingScore;
 
       if (!overallFeedback) {
@@ -1868,7 +2225,7 @@ INSTRUCCIONES DE CORRECCIÓN:
         totalScore,
         passed,
         overallFeedback,
-        answers,
+        answers: safeAnswers,
         questionResults,
       });
     } catch (err) {

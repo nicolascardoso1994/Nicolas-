@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { AssistantMessage, StudyPlan, SummarySection } from '../types/study';
 import { MathText } from './MathText';
+import { safeFetchJson } from '../utils/apiClient';
 import { RevealableFormula } from './RevealableFormula';
 
 interface StudyAssistantDrawerProps {
@@ -131,9 +132,11 @@ export function StudyAssistantDrawer({
     setLoading(true);
 
     try {
-      const response = await fetch('/api/study-assistant', {
+      const data = await safeFetchJson<{
+        reply?: string;
+        suggestedSections?: SummarySection[];
+      }>('/api/study-assistant', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: effectiveMode,
           message: textToSend,
@@ -159,11 +162,6 @@ export function StudyAssistantDrawer({
           })),
         }),
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || 'No pude responder en este momento.');
-      }
 
       const assistantMsg: AssistantMessage = {
         id: `a-${Date.now()}`,

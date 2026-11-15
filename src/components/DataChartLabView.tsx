@@ -17,6 +17,11 @@ import {
   parseTabularData,
 } from '../utils/mathParser';
 import { MathText } from './MathText';
+import {
+  readValidatedFilePayload,
+  safeFetchJson,
+  validateUploadFileSize,
+} from '../utils/apiClient';
 
 interface DataChartLabViewProps {
   subject: string;
@@ -24,38 +29,6 @@ interface DataChartLabViewProps {
 }
 
 type InputMode = 'presets' | 'table' | 'formula' | 'ai';
-
-function readTextOrBinaryFile(file: File): Promise<UploadedFilePayload> {
-  return new Promise((resolve, reject) => {
-    const isText =
-      file.type.startsWith('text/') ||
-      file.name.endsWith('.csv') ||
-      file.name.endsWith('.txt') ||
-      file.name.endsWith('.md');
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error(`No se pudo leer ${file.name}`));
-    if (isText) {
-      reader.onload = () =>
-        resolve({
-          name: file.name,
-          mimeType: file.type || 'text/plain',
-          base64Data: '',
-          textContent: typeof reader.result === 'string' ? reader.result : '',
-        });
-      reader.readAsText(file);
-    } else {
-      reader.onload = () => {
-        const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-        resolve({
-          name: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          base64Data: dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl,
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  });
-}
 
 function formatNum(n: number): string {
   if (!Number.isFinite(n)) return '0';
@@ -109,6 +82,7 @@ export function DataChartLabView({ subject, initialDataset }: DataChartLabViewPr
   const [aiFiles, setAiFiles] = useState<UploadedFilePayload[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [tableError, setTableError] = useState<string | null>(null);
 
   // Sync when initialDataset changes from outside (e.g. from StepByStepView)
   useEffect(() => {
@@ -269,6 +243,12 @@ export function DataChartLabView({ subject, initialDataset }: DataChartLabViewPr
   const handleCsvFileUpload = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
     const file = fileList[0];
+    setTableError(null);
+    const sizeErr = validateUploadFileSize(file);
+    if (sizeErr) {
+      setTableError(sizeErr);
+      return;
+    }
     const text = await file.text();
     setRawPasteText(text);
     const parsed = parseTabularData(text);
@@ -388,19 +368,14 @@ export function DataChartLabView({ subject, initialDataset }: DataChartLabViewPr
 
     setAiLoading(true);
     try {
-      const res = await fetch('/api/generate-chart-data', {
+      const data = await safeFetchJson<ChartDataset>('/api/generate-chart-data', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject,
           promptText: aiPrompt.trim(),
           files: aiFiles,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'No se pudo generar el gráfico.');
-      }
       loadNewDataset(data);
     } catch (err) {
       setAiError(err instanceof Error ? err.message : 'Error de conexión.');
@@ -523,6 +498,11 @@ export function DataChartLabView({ subject, initialDataset }: DataChartLabViewPr
                   />
                 </label>
               </div>
+              {tableError && (
+                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {tableError}
+                </p>
+              )}
             </div>
 
             <div className="lg:col-span-6 grid grid-cols-2 sm:grid-cols-3 gap-3 content-start">
@@ -660,8 +640,15 @@ export function DataChartLabView({ subject, initialDataset }: DataChartLabViewPr
                   accept=".pdf,.csv,.txt,image/*"
                   onChange={async (e) => {
                     if (!e.target.files?.[0]) return;
-                    const loaded = await readTextOrBinaryFile(e.target.files[0]);
-                    setAiFiles([loaded]);
+                    setAiError(null);
+                    try {
+                      const loaded = await readValidatedFilePayload(e.target.files[0]);
+                      setAiFiles([loaded]);
+                    } catch (err) {
+                      setAiError(
+                        err instanceof Error ? err.message : 'No se pudo leer el archivo adjunto.'
+                      );
+                    }
                   }}
                   className="sr-only"
                 />

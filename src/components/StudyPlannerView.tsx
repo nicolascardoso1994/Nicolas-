@@ -25,6 +25,7 @@ const TAB_CTA_LABELS: Record<StudyTab, string> = {
   exercises: 'Ir a Ejercicios',
   exam: 'Ir a Próximo Examen',
   charts: 'Ir a Gráficos',
+  periodic: 'Ir a Tabla Periódica',
   library: 'Ir a Mis Resúmenes',
 };
 

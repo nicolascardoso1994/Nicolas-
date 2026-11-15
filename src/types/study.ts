@@ -1,4 +1,12 @@
-export type StudyTab = 'plan' | 'summary' | 'guide' | 'exercises' | 'exam' | 'charts' | 'library';
+export type StudyTab =
+  | 'plan'
+  | 'summary'
+  | 'guide'
+  | 'exercises'
+  | 'exam'
+  | 'charts'
+  | 'periodic'
+  | 'library';
 
 export type ExamUrgencyTier = 'emergencia' | 'sprint' | 'consolidacion' | 'profundo';
 

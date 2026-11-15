@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trash2, Plus, LineChart, MessageCircleQuestion } from 'lucide-react';
+import { Trash2, Menu, PanelLeft } from 'lucide-react';
 import { SAMPLE_MATH_PLAN, SAMPLE_PHYSICS_PLAN } from './data/samplePlan';
 import {
   AdaptiveExamSummary,
@@ -9,12 +9,14 @@ import {
   StudyTab,
   SummarySection,
 } from './types/study';
+import { DashboardSidebar } from './components/DashboardSidebar';
 import { StudyPlannerView } from './components/StudyPlannerView';
 import { ExamSummaryView } from './components/ExamSummaryView';
 import { ReviewGuideView } from './components/ReviewGuideView';
 import { StepByStepView } from './components/StepByStepView';
 import { ExamCountdownView } from './components/ExamCountdownView';
 import { DataChartLabView } from './components/DataChartLabView';
+import { PeriodicTableView } from './components/PeriodicTableView';
 import { SummariesLibraryView } from './components/SummariesLibraryView';
 import { StudyAssistantDrawer } from './components/StudyAssistantDrawer';
 import { NewPlanModal } from './components/NewPlanModal';
@@ -23,15 +25,7 @@ const STORAGE_KEY = 'codice_study_plans_v1';
 const ACTIVE_ID_KEY = 'codice_active_plan_id_v1';
 const READING_MODE_KEY = 'codice_reading_mode_v1';
 const NIGHT_MODE_KEY = 'codice_night_mode_v1';
-
-const NAV_ITEMS: { id: StudyTab; label: string }[] = [
-  { id: 'plan', label: 'Planificador' },
-  { id: 'library', label: 'Mis Resúmenes' },
-  { id: 'summary', label: 'Resumen' },
-  { id: 'guide', label: 'Guía de Repaso' },
-  { id: 'exercises', label: 'Paso a Paso' },
-  { id: 'exam', label: 'Próximo Examen' },
-];
+const SIDEBAR_COLLAPSED_KEY = 'codice_sidebar_collapsed_v1';
 
 function loadInitialPlans(): StudyPlan[] {
   try {
@@ -116,6 +110,14 @@ export default function App() {
       return false;
     }
   });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -123,10 +125,11 @@ export default function App() {
       localStorage.setItem(ACTIVE_ID_KEY, activePlanId);
       localStorage.setItem(READING_MODE_KEY, String(readingMode));
       localStorage.setItem(NIGHT_MODE_KEY, String(nightMode));
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
     } catch {
       // Ignore storage quota errors
     }
-  }, [plans, activePlanId, readingMode, nightMode]);
+  }, [plans, activePlanId, readingMode, nightMode, sidebarCollapsed]);
 
   const activePlan = plans.find((p) => p.id === activePlanId) ?? plans[0];
 
@@ -313,7 +316,7 @@ export default function App() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col transition-colors duration-200 ${
+      className={`min-h-screen flex transition-colors duration-200 ${
         isNightSurfaceActive
           ? 'night-mode bg-[#0B0F17] text-[#E2E8F0]'
           : isReadingSurfaceActive
@@ -321,203 +324,147 @@ export default function App() {
             : 'bg-slate-50 text-slate-900'
       }`}
     >
-      {/* Top Bar: Strict 3-zone contract */}
-      <header
-        className={`border-b sticky top-0 z-30 transition-colors duration-200 ${
-          isNightSurfaceActive
-            ? 'bg-[#121824] border-[#242F42]'
-            : 'bg-white border-slate-200'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4 lg:gap-8">
-          <a
-            href="#top"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab('plan');
-            }}
-            className={`text-xl font-bold tracking-tight whitespace-nowrap shrink-0 ${
-              isNightSurfaceActive ? 'text-[#F1F5F9]' : 'text-slate-900'
-            }`}
-          >
-            Códice
-          </a>
+      <DashboardSidebar
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+        plansCount={plans.length}
+        activeSubject={activePlan.subject}
+        onOpenNewModal={() => setModalOpen(true)}
+        onOpenAssistant={() =>
+          handleOpenAssistant({
+            mode: activeTab === 'summary' ? 'improve' : 'ask',
+          })
+        }
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
+        isReadingMode={isReadingSurfaceActive}
+        isNightMode={isNightSurfaceActive}
+      />
 
-          <nav aria-label="Secciones de estudio" className="hidden lg:flex items-center gap-5 xl:gap-6">
-            {NAV_ITEMS.map((item) => {
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setActiveTab(item.id)}
-                  className={`py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 ${
-                    isActive
-                      ? isNightSurfaceActive
-                        ? 'border-[#60A5FA] text-[#F8FAFC]'
-                        : 'border-blue-700 text-slate-900'
-                      : isNightSurfaceActive
-                        ? 'border-transparent text-[#94A3B8] hover:text-[#F1F5F9]'
-                        : 'border-transparent text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {item.label}
-                  {item.id === 'library' && (
-                    <span
-                      className={`ml-1 text-xs font-mono tabular-nums ${
-                        isNightSurfaceActive ? 'text-[#64748B]' : 'text-slate-400'
-                      }`}
-                    >
-                      ({plans.length})
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="flex items-center shrink-0">
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors whitespace-nowrap shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Nueva Materia
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Workspace Header & Subject Context */}
-      <div
-        className={`border-b transition-colors duration-200 ${
-          isNightSurfaceActive
-            ? 'bg-[#141B29] border-[#242F42]'
-            : 'bg-white border-slate-200'
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div
-              className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs ${
-                isNightSurfaceActive ? 'text-[#94A3B8]' : 'text-slate-500'
-              }`}
-            >
-              <span>{activePlan.examType}</span>
-              <span aria-hidden="true">·</span>
-              <span className="font-mono tabular-nums">{totalHoursLabel} totales</span>
-              <span aria-hidden="true">·</span>
-              <span>
-                {activePlan.daysAvailable} {activePlan.daysAvailable === 1 ? 'día' : 'días'}
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>Ritmo {activePlan.pace}</span>
-            </div>
-            <h1
-              className={`text-2xl font-semibold tracking-tight text-balance ${
-                isNightSurfaceActive ? 'text-[#F1F5F9]' : 'text-slate-900'
-              }`}
-            >
-              {activePlan.subject}
-            </h1>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setActiveTab('charts')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors whitespace-nowrap shrink-0 ${
-                activeTab === 'charts'
-                  ? 'bg-slate-900 border-slate-900 text-white'
-                  : isNightSurfaceActive
-                    ? 'bg-[#1B2435] border-[#2C384E] text-[#CBD5E1] hover:bg-[#222D42]'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <LineChart className="w-3.5 h-3.5" />
-              Gráficos y Datos
-            </button>
-
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="plan-selector"
-                className={`text-xs font-medium whitespace-nowrap ${
-                  isNightSurfaceActive ? 'text-[#94A3B8]' : 'text-slate-500'
-                }`}
-              >
-                Materia activa:
-              </label>
-              <select
-                id="plan-selector"
-                value={activePlan.id}
-                onChange={(e) => setActivePlanId(e.target.value)}
-                className={`px-3 py-1.5 text-xs font-medium border rounded-lg max-w-[260px] truncate focus:outline-none focus:ring-2 focus:ring-blue-600 ${
-                  isNightSurfaceActive
-                    ? 'bg-[#1B2435] border-[#2C384E] text-[#E2E8F0]'
-                    : 'bg-slate-50 border-slate-200 text-slate-800'
-                }`}
-              >
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.subject}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {plans.length > 1 && (
-              <button
-                type="button"
-                onClick={() => handleDeletePlan(activePlan.id)}
-                aria-label="Eliminar materia actual"
-                className={`p-1.5 rounded-lg transition-colors ${
-                  isNightSurfaceActive
-                    ? 'text-[#64748B] hover:text-red-400 hover:bg-red-950/40'
-                    : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
-                }`}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Mobile / tablet navigation segmented bar */}
-        <div
-          className={`lg:hidden border-t px-4 py-2 flex items-center gap-1 overflow-x-auto ${
-            isNightSurfaceActive ? 'border-[#242F42]' : 'border-slate-100'
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Top Workspace Header */}
+        <header
+          className={`border-b sticky top-0 z-20 transition-colors duration-200 ${
+            isNightSurfaceActive
+              ? 'bg-[#121824] border-[#242F42]'
+              : isReadingSurfaceActive
+                ? 'bg-[#FAF6EB] border-[#E4DCC8]'
+                : 'bg-white border-slate-200'
           }`}
         >
-          {[
-            ...NAV_ITEMS,
-            { id: 'charts' as StudyTab, label: 'Gráficos' },
-          ].map((item) => {
-            const isActive = activeTab === item.id;
-            return (
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
               <button
-                key={item.id}
                 type="button"
-                onClick={() => setActiveTab(item.id)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                  isActive
-                    ? isNightSurfaceActive
-                      ? 'bg-[#253248] text-white'
-                      : 'bg-slate-900 text-white'
-                    : isNightSurfaceActive
-                      ? 'text-[#94A3B8] hover:bg-[#1C2536]'
-                      : 'text-slate-600 hover:bg-slate-100'
+                onClick={() => setMobileSidebarOpen(true)}
+                aria-label="Abrir menú lateral"
+                className={`lg:hidden p-2 rounded-lg border transition-colors shrink-0 ${
+                  isNightSurfaceActive
+                    ? 'bg-[#1B2435] border-[#2C384E] text-[#E2E8F0] hover:bg-[#222D42]'
+                    : isReadingSurfaceActive
+                      ? 'bg-[#F2ECDC] border-[#DFD5BE] text-[#2B2316] hover:bg-[#EAE1CC]'
+                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
                 }`}
               >
-                {item.id === 'library' ? `${item.label} (${plans.length})` : item.label}
+                <Menu className="w-4 h-4" />
               </button>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* Main Content Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+              {sidebarCollapsed && (
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(false)}
+                  aria-label="Desplegar barra lateral"
+                  title="Desplegar barra lateral"
+                  className={`hidden lg:inline-flex p-2 rounded-lg border transition-colors shrink-0 ${
+                    isNightSurfaceActive
+                      ? 'bg-[#1B2435] border-[#2C384E] text-[#E2E8F0] hover:bg-[#222D42]'
+                      : isReadingSurfaceActive
+                        ? 'bg-[#F2ECDC] border-[#DFD5BE] text-[#2B2316] hover:bg-[#EAE1CC]'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <PanelLeft className="w-4 h-4" />
+                </button>
+              )}
+
+              <div className="space-y-0.5 min-w-0">
+                <div
+                  className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs ${
+                    isNightSurfaceActive ? 'text-[#94A3B8]' : 'text-slate-500'
+                  }`}
+                >
+                  <span>{activePlan.examType}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="font-mono tabular-nums">{totalHoursLabel} totales</span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    {activePlan.daysAvailable} {activePlan.daysAvailable === 1 ? 'día' : 'días'}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>Ritmo {activePlan.pace}</span>
+                </div>
+                <h1
+                  className={`text-xl sm:text-2xl font-semibold tracking-tight truncate ${
+                    isNightSurfaceActive ? 'text-[#F1F5F9]' : 'text-slate-900'
+                  }`}
+                >
+                  {activePlan.subject}
+                </h1>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="plan-selector"
+                  className={`text-xs font-medium whitespace-nowrap ${
+                    isNightSurfaceActive ? 'text-[#94A3B8]' : 'text-slate-500'
+                  }`}
+                >
+                  Materia activa:
+                </label>
+                <select
+                  id="plan-selector"
+                  value={activePlan.id}
+                  onChange={(e) => setActivePlanId(e.target.value)}
+                  className={`px-3 py-1.5 text-xs font-medium border rounded-lg max-w-[240px] truncate focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+                    isNightSurfaceActive
+                      ? 'bg-[#1B2435] border-[#2C384E] text-[#E2E8F0]'
+                      : isReadingSurfaceActive
+                        ? 'bg-[#F2ECDC] border-[#DFD5BE] text-[#2B2316]'
+                        : 'bg-slate-50 border-slate-200 text-slate-800'
+                  }`}
+                >
+                  {plans.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.subject}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {plans.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleDeletePlan(activePlan.id)}
+                  aria-label="Eliminar materia actual"
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    isNightSurfaceActive
+                      ? 'text-[#64748B] hover:text-red-400 hover:bg-red-950/40'
+                      : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                  }`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Main Content Viewport */}
+        <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'plan' && (
           <StudyPlannerView
             plan={activePlan}
@@ -578,6 +525,8 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'periodic' && <PeriodicTableView />}
+
         {activeTab === 'library' && (
           <SummariesLibraryView
             plans={plans}
@@ -594,52 +543,35 @@ export default function App() {
         )}
       </main>
 
-      <footer
-        className={`border-t mt-12 transition-colors duration-200 ${
-          isNightSurfaceActive
-            ? 'border-[#242F42] bg-[#121824]'
-            : 'border-slate-200 bg-white'
-        }`}
-      >
-        <div
-          className={`max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4 text-xs ${
-            isNightSurfaceActive ? 'text-[#94A3B8]' : 'text-slate-500'
+        <footer
+          className={`border-t mt-12 transition-colors duration-200 ${
+            isNightSurfaceActive
+              ? 'border-[#242F42] bg-[#121824]'
+              : isReadingSurfaceActive
+                ? 'border-[#E4DCC8] bg-[#FAF6EB]'
+                : 'border-slate-200 bg-white'
           }`}
         >
-          <span>Códice · Organización académica, resúmenes de examen y práctica guiada</span>
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            className={`font-medium whitespace-nowrap ${
-              isNightSurfaceActive
-                ? 'text-[#7CB4FF] hover:text-[#93C5FD]'
-                : 'text-blue-700 hover:text-blue-800'
+          <div
+            className={`max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center justify-between gap-4 text-xs ${
+              isNightSurfaceActive ? 'text-[#94A3B8]' : 'text-slate-500'
             }`}
           >
-            Cargar nuevos apuntes o PDF
-          </button>
-        </div>
-      </footer>
-
-      {/* Floating friendly AI question & readability helper button */}
-      <button
-        type="button"
-        onClick={() =>
-          handleOpenAssistant({
-            mode: activeTab === 'summary' ? 'improve' : 'ask',
-          })
-        }
-        className={`fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl shadow-lg border transition-colors whitespace-nowrap ${
-          isNightSurfaceActive
-            ? 'bg-[#253247] border-[#3B4F72] text-[#F1F5F9] hover:bg-[#30425E]'
-            : isReadingSurfaceActive
-              ? 'bg-[#6F4118] border-[#593312] text-[#FAF6EB] hover:bg-[#593312]'
-              : 'bg-slate-900 border-slate-800 text-white hover:bg-blue-700 hover:border-blue-700'
-        }`}
-      >
-        <MessageCircleQuestion className="w-4 h-4 shrink-0" />
-        <span>¿Dudas? Preguntale a la IA</span>
-      </button>
+            <span>Códice · Organización académica, resúmenes de examen y práctica guiada</span>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className={`font-medium whitespace-nowrap ${
+                isNightSurfaceActive
+                  ? 'text-[#7CB4FF] hover:text-[#93C5FD]'
+                  : 'text-blue-700 hover:text-blue-800'
+              }`}
+            >
+              Cargar nuevos apuntes o PDF
+            </button>
+          </div>
+        </footer>
+      </div>
 
       <StudyAssistantDrawer
         open={assistantOpen}

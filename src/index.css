@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
+  --font-serif: "Source Serif 4", Georgia, Cambria, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+  }
+}
+
+.reading-serif,
+.reading-serif h2,
+.reading-serif h3,
+.reading-serif h4 {
+  font-family: var(--font-serif);
+}
+
+.reading-serif .font-mono {
+  font-family: var(--font-mono);
+}
+
+.night-mode .math-bold,
+.night-mode .math-strong,
+.night-mode .math-display-box,
+.night-mode .katex,
+.night-mode strong,
+.night-mode h2,
+.night-mode h3,
+.night-mode h4 {
+  color: #ffffff;
+}
+
+.night-mode .math-display-box {
+  background-color: #1f2838;
+  border-color: #313f57;
+}
+
+.night-mode .math-code-fallback {
+  background-color: #1f2838;
+  color: #ffffff;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.katex-display {
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}
+
+@media print {
+  header,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+}

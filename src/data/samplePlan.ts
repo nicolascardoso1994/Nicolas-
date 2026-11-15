@@ -609,6 +609,84 @@ export const SAMPLE_PHYSICS_PLAN: StudyPlan = {
         'Abandona la rampa a $v_B = 7.12\\text{ m/s}$ y recorre un alcance horizontal $D = 4.31\\text{ m}$ en $0.606\\text{ s}$ de vuelo.',
     },
   ],
+  examModels: [
+    {
+      id: 'sample-exam-fisica-1',
+      title: 'Primer Parcial Modelo — Dinámica, Rozamiento y Energía',
+      source: 'sample',
+      examType: 'Primer Parcial',
+      passingScore: 60,
+      createdAt: '2026-11-15T08:00:00.000Z',
+      questions: [
+        {
+          id: 'fis-q1',
+          number: 1,
+          type: 'choice',
+          topic: 'Diagrama de Cuerpo Libre y Normal',
+          points: 20,
+          prompt:
+            'Un bloque de masa $m$ descansa sobre un plano inclinado de ángulo $\\theta$ sin rozamiento mientras una fuerza horizontal $F$ lo empuja hacia el plano. ¿Qué expresión describe correctamente la fuerza Normal $N$?',
+          options: [
+            '$N = m g \\cos(\\theta) + F \\sin(\\theta)$',
+            '$N = m g \\cos(\\theta)$',
+            '$N = m g$',
+            '$N = m g \\sin(\\theta) - F \\cos(\\theta)$',
+          ],
+          correctIndex: 0,
+          modelSolution:
+            'Al descomponer tanto el peso como la fuerza horizontal $F$ sobre el eje perpendicular al plano, ambas apuntan hacia la superficie, por lo que $N = mg\\cos(\\theta) + F\\sin(\\theta)$.',
+          modelFormulaLatex: 'N = m g \\cos(\\theta) + F \\sin(\\theta)',
+          gradingCriteria: 'Selección de la opción que suma la componente perpendicular de F al término mg cos(θ).',
+        },
+        {
+          id: 'fis-q2',
+          number: 2,
+          type: 'choice',
+          topic: 'Rozamiento Estático vs. Dinámico',
+          points: 20,
+          prompt:
+            'Un cuerpo de $4\\text{ kg}$ está en reposo sobre una mesa horizontal ($\\mu_e = 0.5$, $\\mu_d = 0.3$, $g = 9.8\\text{ m/s}^2$). Si se le aplica una fuerza horizontal de $12\\text{ N}$, ¿cuál es el valor de la fuerza de rozamiento?',
+          options: [
+            '$12\\text{ N}$ (permanece en reposo)',
+            '$19.6\\text{ N}$ (rozamiento estático máximo)',
+            '$11.76\\text{ N}$ (desliza con rozamiento dinámico)',
+            '$0\\text{ N}$ porque no hay aceleración',
+          ],
+          correctIndex: 0,
+          modelSolution:
+            'El tope estático es $f_{e,\\text{máx}} = 0.5 \\cdot 4 \\cdot 9.8 = 19.6\\text{ N}$. Como $12\\text{ N} < 19.6\\text{ N}$, el cuerpo no desliza y el rozamiento estático toma exactamente el valor necesario para equilibrar: $12\\text{ N}$.',
+          modelFormulaLatex: 'f_{e,\\text{máx}} = \\mu_e N = 19.6\\text{ N} > 12\\text{ N}',
+          gradingCriteria: 'Comprender que el rozamiento estático es variable hasta f_e,máx y no vale μ_e·N automáticamente.',
+        },
+        {
+          id: 'fis-q3',
+          number: 3,
+          type: 'open',
+          topic: 'Trabajo y Energía con Rozamiento',
+          points: 30,
+          prompt:
+            'Un bloque de $2\\text{ kg}$ parte del reposo desde una altura $h = 3\\text{ m}$ por una rampa lisa y luego recorre un tramo horizontal áspero de $5\\text{ m}$ hasta detenerse. Calculá el coeficiente de rozamiento dinámico $\\mu_d$ en el tramo horizontal (usá $g = 9.8\\text{ m/s}^2$).',
+          modelSolution:
+            'Aplicando $W_{FNC} = \\Delta K + \\Delta U$: parte del reposo y termina en reposo ($\\Delta K = 0$). La energía potencial inicial $mgh$ se disipa íntegramente por el trabajo del rozamiento $-\\mu_d m g d$. Despejando: $\\mu_d = h / d = 3 / 5 = 0.60$.',
+          modelFormulaLatex: '-\\mu_d m g d = -m g h \\implies \\mu_d = \\frac{h}{d} = 0.60',
+          gradingCriteria: '15 pts por plantear correctamente el balance energético con trabajo negativo del rozamiento; 15 pts por despejar μ_d = 0.60.',
+        },
+        {
+          id: 'fis-q4',
+          number: 4,
+          type: 'open',
+          topic: 'Dinámica de Sistemas Vinculados',
+          points: 30,
+          prompt:
+            'Dos bloques de masas $m_1 = 3\\text{ kg}$ (sobre mesa horizontal lisa) y $m_2 = 2\\text{ kg}$ (colgando verticalmente) están unidos por una cuerda ideal que pasa por una polea sin fricción. Determiná la aceleración del sistema y la tensión de la cuerda ($g = 9.8\\text{ m/s}^2$).',
+          modelSolution:
+            'Para el sistema completo, la fuerza neta motriz es el peso colgante $m_2 g = 19.6\\text{ N}$ y la masa total es $m_1 + m_2 = 5\\text{ kg}$. Entonces $a = 19.6 / 5 = 3.92\\text{ m/s}^2$. Luego, para $m_1$: $T = m_1 a = 3 \\cdot 3.92 = 11.76\\text{ N}$.',
+          modelFormulaLatex: 'a = \\frac{m_2 g}{m_1 + m_2} = 3.92\\text{ m/s}^2 \\qquad ; \\qquad T = m_1 a = 11.76\\text{ N}',
+          gradingCriteria: '15 pts por plantear las ecuaciones de Newton y hallar a = 3.92 m/s²; 15 pts por calcular T = 11.76 N (menor que m_2 g).',
+        },
+      ],
+    },
+  ],
 };
 
 export const SAMPLE_MATH_PLAN: StudyPlan = {
@@ -809,6 +887,77 @@ export const SAMPLE_MATH_PLAN: StudyPlan = {
         },
       ],
       finalAnswer: 'Radio $R = 3$ e intervalo de convergencia $[-1, 5)$.',
+    },
+  ],
+  examModels: [
+    {
+      id: 'sample-exam-math-1',
+      title: 'Segundo Parcial Modelo — Integrales y Series',
+      source: 'sample',
+      examType: 'Segundo Parcial',
+      passingScore: 60,
+      createdAt: '2026-11-15T08:00:00.000Z',
+      questions: [
+        {
+          id: 'mat-q1',
+          number: 1,
+          type: 'choice',
+          topic: 'Integrales Impropias',
+          points: 25,
+          prompt:
+            '¿Para qué valores de $p$ converge la integral impropia de primera especie $\\int_{1}^{\\infty} \\frac{1}{x^p}\\,dx$?',
+          options: ['$p > 1$', '$p \\ge 1$', '$0 < p < 1$', 'Para todo $p > 0$'],
+          correctIndex: 0,
+          modelSolution:
+            'La primitiva es $x^{1-p}/(1-p)$ para $p \\neq 1$ y $\\ln(x)$ para $p=1$; solo tiende a un límite finito en $\\infty$ cuando $1-p < 0$, es decir $p > 1$.',
+          modelFormulaLatex: '\\int_{1}^{\\infty} \\frac{1}{x^p}\\,dx < \\infty \\iff p > 1',
+          gradingCriteria: 'Identificar la condición estricta p > 1.',
+        },
+        {
+          id: 'mat-q2',
+          number: 2,
+          type: 'choice',
+          topic: 'Condición Necesaria de Convergencia',
+          points: 25,
+          prompt:
+            'Si $\\lim_{n \\to \\infty} a_n = 0$, ¿qué podemos concluir con certeza sobre la serie $\\sum_{n=1}^{\\infty} a_n$?',
+          options: [
+            'No podemos asegurar convergencia; la serie aún puede divergir (ej: serie armónica)',
+            'La serie converge absolutamente',
+            'La serie converge por criterio de Cauchy',
+            'La serie diverge siempre',
+          ],
+          correctIndex: 0,
+          modelSolution:
+            'Que el término general tienda a cero es condición necesaria pero NO suficiente para que la serie converja, como muestra $\\sum 1/n$.',
+          gradingCriteria: 'Distinguir condición necesaria de suficiente.',
+        },
+        {
+          id: 'mat-q3',
+          number: 3,
+          type: 'open',
+          topic: 'Integración por Partes',
+          points: 25,
+          prompt: 'Calculá la integral indefinida $\\int x e^{2x}\\,dx$ indicando claramente tu elección de $u$ y $dv$.',
+          modelSolution:
+            'Elegimos $u = x \\implies du = dx$ y $dv = e^{2x}dx \\implies v = \\frac{1}{2}e^{2x}$. Aplicando $uv - \\int v\\,du$ resulta $\\frac{x}{2}e^{2x} - \\frac{1}{4}e^{2x} + C$.',
+          modelFormulaLatex: '\\int x e^{2x}\\,dx = \\frac{1}{2}x e^{2x} - \\frac{1}{4}e^{2x} + C',
+          gradingCriteria: '10 pts por elegir u=x y dv=e^{2x}dx; 15 pts por integrar correctamente sin olvidar el factor 1/2 y + C.',
+        },
+        {
+          id: 'mat-q4',
+          number: 4,
+          type: 'open',
+          topic: 'Radio e Intervalo de Convergencia',
+          points: 25,
+          prompt:
+            'Determiná el radio de convergencia $R$ y analizá ambos extremos de $\\sum_{n=1}^{\\infty} \\frac{(x-2)^n}{n \\cdot 3^n}$.',
+          modelSolution:
+            'Por D’Alembert, $|x-2|/3 < 1 \\implies R = 3$ sobre $(-1, 5)$. En $x = 5$ queda $\\sum 1/n$ (diverge); en $x = -1$ queda $\\sum (-1)^n/n$ (converge por Leibniz). Intervalo: $[-1, 5)$.',
+          modelFormulaLatex: 'R = 3 \\qquad ; \\qquad I = [-1, 5)',
+          gradingCriteria: '15 pts por hallar R=3; 10 pts por justificar ambos extremos por separado.',
+        },
+      ],
     },
   ],
 };
@@ -1402,6 +1551,80 @@ export const SAMPLE_ANATOMY_PLAN: StudyPlan = {
       ],
       finalAnswer:
         'Polaridad funcional completada: Dendritas (recepción) → Soma/Cono axónico (integración) → Axón mielinizado/Nódulos (conducción saltatoria) → Botones terminales (liberación de neurotransmisores).',
+    },
+  ],
+  examModels: [
+    {
+      id: 'sample-exam-anat-1',
+      title: 'Primer Parcial Modelo — Anatomía Cardiovascular y Neurona',
+      source: 'sample',
+      examType: 'Primer Parcial',
+      passingScore: 60,
+      createdAt: '2026-11-15T08:00:00.000Z',
+      questions: [
+        {
+          id: 'ana-q1',
+          number: 1,
+          type: 'choice',
+          topic: 'Válvulas Cardíacas',
+          points: 25,
+          prompt:
+            '¿Qué válvula impide el reflujo de sangre desde el ventrículo izquierdo hacia la aurícula izquierda durante la sístole ventricular?',
+          options: [
+            'Válvula mitral o bicúspide',
+            'Válvula tricúspide',
+            'Válvula sigmoidea aórtica',
+            'Válvula sigmoidea pulmonar',
+          ],
+          correctIndex: 0,
+          modelSolution:
+            'La válvula mitral (bicúspide) comunica la aurícula izquierda con el ventrículo izquierdo y se cierra en la sístole ventricular para evitar el retroceso hacia la aurícula.',
+          gradingCriteria: 'Identificar correctamente la válvula auriculoventricular izquierda (mitral).',
+        },
+        {
+          id: 'ana-q2',
+          number: 2,
+          type: 'choice',
+          topic: 'Conducción Saltatoria Neuronal',
+          points: 25,
+          prompt:
+            'En una neurona multipolar mielinizada, ¿en qué estructura anatómica se regenera el potencial de acción durante la conducción saltatoria?',
+          options: [
+            'En los nódulos de Ranvier',
+            'Exclusivamente en las dendritas distales',
+            'Dentro de las células de Schwann recubiertas de lípidos',
+            'En el nucléolo del soma neuronal',
+          ],
+          correctIndex: 0,
+          modelSolution:
+            'Los nódulos de Ranvier son los espacios sin mielina entre segmentos consecutivos donde se concentran los canales de sodio dependientes de voltaje.',
+          gradingCriteria: 'Reconocer la función de los nódulos de Ranvier en la conducción saltatoria.',
+        },
+        {
+          id: 'ana-q3',
+          number: 3,
+          type: 'open',
+          topic: 'Circulación Menor y Mayor',
+          points: 25,
+          prompt:
+            'Describí ordenadamente el recorrido de la sangre desde que ingresa desoxigenada a la aurícula derecha hasta que sale oxigenada por la arteria aorta, nombrando las cavidades y válvulas atravesadas.',
+          modelSolution:
+            'Aurícula derecha → válvula tricúspide → ventrículo derecho → válvula pulmonar → arteria pulmonar hacia pulmones (hematosis) → venas pulmonares → aurícula izquierda → válvula mitral → ventrículo izquierdo → válvula aórtica → arteria aorta.',
+          gradingCriteria: '15 pts por la secuencia correcta de cavidades y vasos; 10 pts por nombrar correctamente las cuatro válvulas en orden.',
+        },
+        {
+          id: 'ana-q4',
+          number: 4,
+          type: 'open',
+          topic: 'Morfología Funcional de la Neurona',
+          points: 25,
+          prompt:
+            'Explicá la diferencia estructural y funcional entre las dendritas y el axón, y por qué la pared del ventrículo izquierdo es más gruesa que la del ventrículo derecho.',
+          modelSolution:
+            'Las dendritas son múltiples, cortas y ramificadas, especializadas en recibir señales aferentes; el axón es una prolongación única que conduce el impulso eferente hacia los botones terminales. El ventrículo izquierdo tiene miocardio más grueso porque debe vencer la alta resistencia vascular de la circulación sistémica (mayor), a diferencia del circuito pulmonar de baja presión.',
+          gradingCriteria: '12 pts por contrastar dendritas vs axón; 13 pts por relacionar el grosor del miocardio izquierdo con la presión sistémica.',
+        },
+      ],
     },
   ],
 };

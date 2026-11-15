@@ -404,6 +404,12 @@ export function SummariesLibraryView({
                   <span className="font-mono tabular-nums">
                     {sections.length || 1} secciones · {plan.formulas.length} fórmulas ·{' '}
                     {completedBlocks}/{plan.studyBlocks.length} bloques
+                    {' · '}
+                    {plan.examModels?.some((m) => m.latestAttempt?.passed) ? (
+                      <span className="text-emerald-700 font-semibold">Materia aprobada</span>
+                    ) : (
+                      <span className="text-amber-700">Parcial pendiente</span>
+                    )}
                   </span>
                 </div>
 

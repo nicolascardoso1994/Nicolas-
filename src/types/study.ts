@@ -233,6 +233,49 @@ export interface ExamAlert {
   reminderTime: string;
 }
 
+export interface ExamModelQuestion {
+  id: string;
+  number: number;
+  type: 'choice' | 'open';
+  topic: string;
+  points: number;
+  prompt: string;
+  options?: string[];
+  correctIndex?: number;
+  modelSolution: string;
+  modelFormulaLatex?: string;
+  gradingCriteria: string;
+}
+
+export interface ExamAttemptQuestionResult {
+  questionId: string;
+  earnedPoints: number;
+  maxPoints: number;
+  isCorrect: boolean;
+  feedback: string;
+}
+
+export interface ExamAttemptResult {
+  submittedAt: string;
+  totalScore: number;
+  passed: boolean;
+  overallFeedback: string;
+  answers: Record<string, string | number>;
+  questionResults: ExamAttemptQuestionResult[];
+}
+
+export interface ExamModel {
+  id: string;
+  title: string;
+  source: 'uploaded' | 'generated' | 'sample';
+  examType: string;
+  passingScore: number;
+  createdAt: string;
+  sourceNotes?: string;
+  questions: ExamModelQuestion[];
+  latestAttempt?: ExamAttemptResult;
+}
+
 export interface StudyPlan {
   id: string;
   subject: string;
@@ -251,6 +294,7 @@ export interface StudyPlan {
   summarySections?: SummarySection[];
   visualExamples?: VisualExample[];
   adaptiveSummary?: AdaptiveExamSummary;
+  examModels?: ExamModel[];
   studyBlocks: StudyBlock[];
   keyConcepts: KeyConcept[];
   formulas: FormulaItem[];

@@ -5,6 +5,8 @@ import {
   AdaptiveExamSummary,
   ChartDataset,
   ExamAlert,
+  ExamAttemptResult,
+  ExamModel,
   ExamReminderConfig,
   StepByStepExercise,
   StudyPlan,
@@ -61,6 +63,9 @@ function loadInitialPlans(): StudyPlan[] {
               adaptiveSummary: p.adaptiveSummary?.summarySections?.length
                 ? p.adaptiveSummary
                 : SAMPLE_PHYSICS_PLAN.adaptiveSummary,
+              examModels: p.examModels?.length
+                ? p.examModels
+                : SAMPLE_PHYSICS_PLAN.examModels,
               examDate: p.examDate || SAMPLE_PHYSICS_PLAN.examDate,
             };
           }
@@ -70,6 +75,9 @@ function loadInitialPlans(): StudyPlan[] {
               ...p,
               folder: p.folder || SAMPLE_MATH_PLAN.folder,
               examDate: p.examDate || SAMPLE_MATH_PLAN.examDate,
+              examModels: p.examModels?.length
+                ? p.examModels
+                : SAMPLE_MATH_PLAN.examModels,
             };
           }
           if (p.id === SAMPLE_ANATOMY_PLAN.id) {
@@ -82,6 +90,9 @@ function loadInitialPlans(): StudyPlan[] {
               visualExamples: p.visualExamples?.length
                 ? p.visualExamples
                 : SAMPLE_ANATOMY_PLAN.visualExamples,
+              examModels: p.examModels?.length
+                ? p.examModels
+                : SAMPLE_ANATOMY_PLAN.examModels,
             };
           }
           return {
@@ -310,6 +321,29 @@ export default function App() {
     updateActivePlan((plan) => ({
       ...plan,
       reminderConfig,
+    }));
+  };
+
+  const handleAddExamModel = (model: ExamModel) => {
+    updateActivePlan((plan) => ({
+      ...plan,
+      examModels: [model, ...(plan.examModels ?? [])],
+    }));
+  };
+
+  const handleSaveExamAttempt = (modelId: string, attempt: ExamAttemptResult) => {
+    updateActivePlan((plan) => ({
+      ...plan,
+      examModels: (plan.examModels ?? []).map((m) =>
+        m.id === modelId ? { ...m, latestAttempt: attempt } : m
+      ),
+    }));
+  };
+
+  const handleDeleteExamModel = (modelId: string) => {
+    updateActivePlan((plan) => ({
+      ...plan,
+      examModels: (plan.examModels ?? []).filter((m) => m.id !== modelId),
     }));
   };
 
@@ -749,6 +783,9 @@ export default function App() {
           <ExamSummaryView
             plan={activePlan}
             onNavigateTab={setActiveTab}
+            onAddExamModel={handleAddExamModel}
+            onSaveExamAttempt={handleSaveExamAttempt}
+            onDeleteExamModel={handleDeleteExamModel}
             readingMode={readingMode}
             onToggleReadingMode={handleToggleReadingMode}
             nightMode={nightMode}

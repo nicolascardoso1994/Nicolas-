@@ -651,6 +651,93 @@ const studyAssistantResponseSchema = {
   required: ["reply"],
 };
 
+const examModelSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: {
+      type: Type.STRING,
+      description: "Título claro del modelo de parcial o final (ej: Primer Parcial Modelo — Dinámica y Energía).",
+    },
+    questions: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          number: { type: Type.INTEGER },
+          type: {
+            type: Type.STRING,
+            description: "Uno de: 'choice' (opción múltiple de 4 opciones) o 'open' (desarrollo / ejercicio / análisis de caso).",
+          },
+          topic: { type: Type.STRING },
+          points: {
+            type: Type.INTEGER,
+            description: "Puntaje de la consigna; la suma de todas las preguntas debe dar exactamente 100.",
+          },
+          prompt: {
+            type: Type.STRING,
+            description: "Enunciado completo y claro de nivel universitario. Si usa símbolos matemáticos usar $...$, nunca inventar cuentas en materias teóricas.",
+          },
+          options: {
+            type: Type.ARRAY,
+            description: "Obligatorio (4 opciones) si type='choice'; arreglo vacío [] si type='open'.",
+            items: { type: Type.STRING },
+          },
+          correctIndex: {
+            type: Type.INTEGER,
+            description: "Índice 0..3 de la opción correcta si type='choice'.",
+          },
+          modelSolution: {
+            type: Type.STRING,
+            description: "Resolución modelo paso a paso o respuesta esperada completa para corregir.",
+          },
+          modelFormulaLatex: {
+            type: Type.STRING,
+            description: "Fórmula clave usada en LaTeX puro (sin $$) SOLO en materias cuantitativas; vacío '' en materias teóricas.",
+          },
+          gradingCriteria: {
+            type: Type.STRING,
+            description: "Criterio concreto de corrección para asignar puntaje parcial o total.",
+          },
+        },
+        required: [
+          "number",
+          "type",
+          "topic",
+          "points",
+          "prompt",
+          "modelSolution",
+          "gradingCriteria",
+        ],
+      },
+    },
+  },
+  required: ["title", "questions"],
+};
+
+const gradeExamSchema = {
+  type: Type.OBJECT,
+  properties: {
+    overallFeedback: {
+      type: Type.STRING,
+      description: "Devolución general breve y constructiva al estudiante sobre su desempeño en el parcial.",
+    },
+    questionGrades: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          questionId: { type: Type.STRING },
+          earnedPoints: { type: Type.INTEGER },
+          isCorrect: { type: Type.BOOLEAN },
+          feedback: { type: Type.STRING },
+        },
+        required: ["questionId", "earnedPoints", "isCorrect", "feedback"],
+      },
+    },
+  },
+  required: ["overallFeedback", "questionGrades"],
+};
+
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: "25mb" }));
@@ -1372,6 +1459,417 @@ INSTRUCCIONES:
               formulaCaption: s.formulaCaption ? String(s.formulaCaption) : undefined,
             }))
           : [],
+      });
+    } catch (err) {
+      const { status, message } = extractGeminiError(err);
+      return res.status(status).json({ error: message });
+    }
+  });
+
+  app.post("/api/generate-exam-model", async (req, res) => {
+    try {
+      const {
+        subject = "Materia Universitaria",
+        subjectMode = "quantitative",
+        examType = "Primer Parcial",
+        mode = "from_material",
+        customTitle = "",
+        uploadedText = "",
+        files = [],
+        executiveSummary = "",
+        summarySections = [],
+        keyConcepts = [],
+        formulas = [],
+        examTraps = [],
+        difficultyFocus = "Parcial estándar",
+      } = req.body ?? {};
+
+      const isUploadMode = mode === "from_upload";
+      if (
+        isUploadMode &&
+        (!uploadedText || String(uploadedText).trim().length === 0) &&
+        (!Array.isArray(files) || files.length === 0)
+      ) {
+        return res.status(400).json({
+          error: "Pegá el texto de tu modelo de parcial o adjuntá un archivo (PDF, imagen o texto).",
+        });
+      }
+
+      const ai = getAiClient();
+      const isTheoretical = subjectMode === "theoretical";
+
+      const sectionsSummary = Array.isArray(summarySections)
+        ? summarySections
+            .slice(0, 8)
+            .map(
+              (s: { order?: number; title?: string; content?: string }) =>
+                `${s.order ?? ""}. ${s.title ?? ""}: ${String(s.content ?? "").slice(0, 350)}`
+            )
+            .join("\n")
+        : "";
+
+      const conceptsSummary = Array.isArray(keyConcepts)
+        ? keyConcepts
+            .slice(0, 8)
+            .map((c: { term?: string; academicDefinition?: string }) => `- ${c.term ?? ""}: ${c.academicDefinition ?? ""}`)
+            .join("\n")
+        : "";
+
+      const formulasSummary =
+        !isTheoretical && Array.isArray(formulas) && formulas.length > 0
+          ? formulas
+              .slice(0, 8)
+              .map((f: { name?: string; latex?: string }) => `- ${f.name ?? ""}: ${f.latex ?? ""}`)
+              .join("\n")
+          : "";
+
+      const trapsSummary = Array.isArray(examTraps)
+        ? examTraps
+            .slice(0, 6)
+            .map((t: { mistake?: string; howToAvoid?: string }) => `- ${t.mistake ?? ""} -> ${t.howToAvoid ?? ""}`)
+            .join("\n")
+        : "";
+
+      const prompt = isUploadMode
+        ? `
+El estudiante cargó un MODELO DE PARCIAL REAL para la materia "${subject}" (${examType}).
+${customTitle ? `Título deseado: ${customTitle}` : ""}
+
+INSTRUCCIÓN PRINCIPAL:
+1. Leé cuidadosamente el archivo adjunto o texto pegado con las consignas del modelo de parcial.
+2. Convertí cada consigna en una pregunta evaluable dentro de \`questions\` (entre 3 y 6 preguntas). Si el parcial tiene ítems de opción múltiple usá \`type: "choice"\` con sus 4 opciones; si son ejercicios de desarrollo, problemas o análisis clínico/anatómico usá \`type: "open"\`.
+3. Ajustá \`points\` proporcionalmente para que la suma total de todas las preguntas sea EXACTAMENTE 100 puntos.
+4. Escribí \`modelSolution\` y \`gradingCriteria\` detallados y precisos para poder corregir automáticamente al estudiante cuando lo rinda.
+5. ${
+            isTheoretical
+              ? "Esta asignatura es teórica/morfológica (NO requiere cuentas matemáticas): mantené `modelFormulaLatex` vacío `\"\"` y evaluá relaciones conceptuales, ubicación anatómica o casos clínicos/biológicos."
+              : "Si una consigna requiere una fórmula matemática/física/química clave en su resolución, ponela en `modelFormulaLatex` (LaTeX puro sin $$)."
+          }
+
+TEXTO DEL MODELO CARGADO:
+${String(uploadedText || "(Ver archivo adjunto)")}
+
+MATERIAL DE APOYO DE LA MATERIA:
+${executiveSummary}
+${conceptsSummary}
+`
+        : `
+Generá un MODELO DE PARCIAL UNIVERSITARIO REALISTA Y EVALUABLE basado exclusivamente en el material de estudio cargado de la materia "${subject}" (${examType} · Enfoque: ${difficultyFocus}).
+
+MATERIAL DE ESTUDIO CARGADO:
+- Resumen ejecutivo: ${executiveSummary}
+- Secciones:
+${sectionsSummary}
+- Conceptos clave:
+${conceptsSummary}
+${formulasSummary ? `- Fórmulas:\n${formulasSummary}` : ""}
+${trapsSummary ? `- Trampas frecuentes a evaluar:\n${trapsSummary}` : ""}
+
+REQUISITOS DEL PARCIAL:
+1. Generá exactamente 4 o 5 consignas (\`questions\`) cuya suma de \`points\` dé EXACTAMENTE 100 puntos (ej: 20 + 20 + 30 + 30 = 100).
+2. Incluí una mezcla equilibrada: al menos 2 preguntas de \`type: "choice"\` (4 opciones realistas donde los distractores reflejan las trampas típicas de examen) y al menos 2 consignas de \`type: "open"\` (para que el estudiante desarrolle su respuesta o resolución).
+3. ${
+            isTheoretical
+              ? "ATENCIÓN — MATERIA TEÓRICA/VISUAL SIN CUENTAS: NO inventes cálculos, fórmulas ni ecuaciones matemáticas. Dejá `modelFormulaLatex` como `\"\"`. Basá las consignas en identificación anatómica/estructural, relaciones funcionales, fisiología o casos clínicos/conceptuales."
+              : "En consignas cuantitativas, incluí datos numéricos concretos y coherentes en `prompt`, la fórmula principal en `modelFormulaLatex` (LaTeX puro sin $$) y la resolución paso a paso en `modelSolution`."
+          }
+4. Completá \`gradingCriteria\` con criterios claros para corregir la respuesta del estudiante.
+`;
+
+      const contents = buildContentParts(prompt, Array.isArray(files) ? files : []);
+      const response = await ai.models.generateContent({
+        model: "gemini-4-hydrogen",
+        contents: { parts: contents },
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
+          responseMimeType: "application/json",
+          responseSchema: examModelSchema,
+          systemInstruction:
+            "Sos un profesor titular universitario. Redactás exámenes parciales y finales rigurosos, claros y justos en español, con rúbricas de corrección exactas.",
+        },
+      });
+
+      const parsed = JSON.parse((response.text ?? "{}").trim());
+      const rawQuestions = Array.isArray(parsed.questions) ? parsed.questions : [];
+      const rawSum = rawQuestions.reduce(
+        (acc: number, q: Record<string, unknown>) => acc + (Number(q.points) || 0),
+        0
+      );
+
+      const questions = rawQuestions.map((q: Record<string, unknown>, idx: number) => {
+        const type = q.type === "choice" && Array.isArray(q.options) && q.options.length >= 2
+          ? "choice"
+          : "open";
+        const basePoints = Number(q.points) || Math.round(100 / Math.max(1, rawQuestions.length));
+        const normalizedPoints =
+          rawSum > 0 ? Math.max(5, Math.round((basePoints / rawSum) * 100)) : 25;
+
+        return {
+          id: `q-${Date.now()}-${idx + 1}`,
+          number: Number(q.number) || idx + 1,
+          type,
+          topic: String(q.topic ?? subject),
+          points: normalizedPoints,
+          prompt: String(q.prompt ?? ""),
+          options:
+            type === "choice" && Array.isArray(q.options)
+              ? q.options.map((o) => String(o))
+              : undefined,
+          correctIndex:
+            type === "choice"
+              ? Math.max(0, Math.min((Array.isArray(q.options) ? q.options.length : 4) - 1, Number(q.correctIndex) || 0))
+              : undefined,
+          modelSolution: String(q.modelSolution ?? ""),
+          modelFormulaLatex:
+            !isTheoretical && q.modelFormulaLatex ? String(q.modelFormulaLatex) : undefined,
+          gradingCriteria: String(q.gradingCriteria ?? ""),
+        };
+      });
+
+      // Ensure exact sum = 100
+      if (questions.length > 0) {
+        const currentTotal = questions.reduce((acc: number, q: { points: number }) => acc + q.points, 0);
+        questions[questions.length - 1].points = Math.max(
+          5,
+          questions[questions.length - 1].points + (100 - currentTotal)
+        );
+      }
+
+      return res.json({
+        id: `exam-model-${Date.now()}`,
+        title: String(
+          customTitle?.trim() ||
+            parsed.title ||
+            (isUploadMode ? `Modelo cargado · ${subject}` : `Simulacro de ${examType} · ${subject}`)
+        ),
+        source: isUploadMode ? "uploaded" : "generated",
+        examType,
+        passingScore: 60,
+        createdAt: new Date().toISOString(),
+        sourceNotes: isUploadMode && uploadedText ? String(uploadedText).slice(0, 1000) : undefined,
+        questions,
+      });
+    } catch (err) {
+      const { status, message } = extractGeminiError(err);
+      return res.status(status).json({ error: message });
+    }
+  });
+
+  app.post("/api/grade-exam-model", async (req, res) => {
+    try {
+      const {
+        subject = "Materia Universitaria",
+        subjectMode = "quantitative",
+        examModel,
+        answers = {},
+      } = req.body ?? {};
+
+      if (!examModel || !Array.isArray(examModel.questions) || examModel.questions.length === 0) {
+        return res.status(400).json({ error: "No se encontró un modelo de parcial válido para evaluar." });
+      }
+
+      const questions = examModel.questions as Array<{
+        id: string;
+        number: number;
+        type: "choice" | "open";
+        topic: string;
+        points: number;
+        prompt: string;
+        options?: string[];
+        correctIndex?: number;
+        modelSolution: string;
+        gradingCriteria: string;
+      }>;
+
+      const choiceResults: Array<{
+        questionId: string;
+        earnedPoints: number;
+        maxPoints: number;
+        isCorrect: boolean;
+        feedback: string;
+      }> = [];
+
+      const openToEvaluate: Array<{
+        questionId: string;
+        number: number;
+        points: number;
+        prompt: string;
+        modelSolution: string;
+        gradingCriteria: string;
+        studentAnswer: string;
+      }> = [];
+
+      const blankOpenResults: Array<{
+        questionId: string;
+        earnedPoints: number;
+        maxPoints: number;
+        isCorrect: boolean;
+        feedback: string;
+      }> = [];
+
+      for (const q of questions) {
+        const rawAns = answers[q.id];
+        if (q.type === "choice") {
+          const chosen = typeof rawAns === "number" ? rawAns : Number(rawAns);
+          const hasChosen = Number.isFinite(chosen) && rawAns !== "" && rawAns !== undefined && rawAns !== null;
+          const isCorrect = hasChosen && chosen === q.correctIndex;
+          choiceResults.push({
+            questionId: q.id,
+            earnedPoints: isCorrect ? q.points : 0,
+            maxPoints: q.points,
+            isCorrect,
+            feedback: !hasChosen
+              ? "No seleccionaste ninguna opción."
+              : isCorrect
+                ? `¡Correcto! ${q.modelSolution}`
+                : `Respuesta incorrecta. ${q.modelSolution}`,
+          });
+        } else {
+          const textAns = typeof rawAns === "string" ? rawAns.trim() : "";
+          if (!textAns) {
+            blankOpenResults.push({
+              questionId: q.id,
+              earnedPoints: 0,
+              maxPoints: q.points,
+              isCorrect: false,
+              feedback: "Dejaste esta consigna sin responder. Revisá la resolución modelo para practicarla.",
+            });
+          } else {
+            openToEvaluate.push({
+              questionId: q.id,
+              number: q.number,
+              points: q.points,
+              prompt: q.prompt,
+              modelSolution: q.modelSolution,
+              gradingCriteria: q.gradingCriteria,
+              studentAnswer: textAns,
+            });
+          }
+        }
+      }
+
+      let openAiResults: Array<{
+        questionId: string;
+        earnedPoints: number;
+        maxPoints: number;
+        isCorrect: boolean;
+        feedback: string;
+      }> = [];
+      let overallFeedback = "";
+
+      if (openToEvaluate.length > 0) {
+        const ai = getAiClient();
+        const prompt = `
+Evaluá las respuestas de desarrollo del estudiante en este examen de "${subject}" (${subjectMode === "theoretical" ? "materia teórica/conceptual" : "materia cuantitativa"}).
+
+PREGUNTAS Y RESPUESTAS DEL ESTUDIANTE:
+${openToEvaluate
+  .map(
+    (item) => `
+---
+questionId: ${item.questionId}
+Consigna #${item.number} (Puntaje máximo: ${item.points} pts)
+Enunciado: ${item.prompt}
+Solución esperada: ${item.modelSolution}
+Criterio de evaluación: ${item.gradingCriteria}
+RESPUESTA DEL ESTUDIANTE:
+"""
+${item.studentAnswer}
+"""
+`
+  )
+  .join("\n")}
+
+INSTRUCCIONES DE CORRECCIÓN:
+1. Para cada \`questionId\`, asigná \`earnedPoints\` entero entre 0 y el puntaje máximo de esa pregunta (otorgá puntaje parcial justo si planteó bien la idea pero faltó un detalle o cuenta).
+2. Marcá \`isCorrect: true\` si obtuvo al menos el 60% del puntaje de esa pregunta.
+3. En \`feedback\`, explicá con tono claro y amigable qué estuvo bien y qué faltó corregir.
+4. En \`overallFeedback\`, resumí en 2 oraciones el desempeño general y qué tema reforzar.
+`;
+
+        const response = await ai.models.generateContent({
+          model: "gemini-4-hydrogen",
+          contents: prompt,
+          config: {
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+            responseMimeType: "application/json",
+            responseSchema: gradeExamSchema,
+            systemInstruction:
+              "Sos un docente universitario justo y claro. Corregís exámenes con precisión académica y devoluciones constructivas en español.",
+          },
+        });
+
+        const parsed = JSON.parse((response.text ?? "{}").trim());
+        overallFeedback = String(parsed.overallFeedback ?? "");
+        const gradesMap = new Map<string, { earnedPoints: number; isCorrect: boolean; feedback: string }>();
+        if (Array.isArray(parsed.questionGrades)) {
+          for (const g of parsed.questionGrades) {
+            gradesMap.set(String(g.questionId), {
+              earnedPoints: Number(g.earnedPoints) || 0,
+              isCorrect: Boolean(g.isCorrect),
+              feedback: String(g.feedback ?? ""),
+            });
+          }
+        }
+
+        openAiResults = openToEvaluate.map((item) => {
+          const g = gradesMap.get(item.questionId);
+          const earned = Math.max(0, Math.min(item.points, Math.round(g?.earnedPoints ?? 0)));
+          return {
+            questionId: item.questionId,
+            earnedPoints: earned,
+            maxPoints: item.points,
+            isCorrect: g ? g.isCorrect : earned >= Math.ceil(item.points * 0.6),
+            feedback: g?.feedback || "Evaluado según la rúbrica del parcial.",
+          };
+        });
+      }
+
+      const resultById = new Map<string, {
+        questionId: string;
+        earnedPoints: number;
+        maxPoints: number;
+        isCorrect: boolean;
+        feedback: string;
+      }>();
+      for (const r of [...choiceResults, ...blankOpenResults, ...openAiResults]) {
+        resultById.set(r.questionId, r);
+      }
+
+      const questionResults = questions.map(
+        (q) =>
+          resultById.get(q.id) ?? {
+            questionId: q.id,
+            earnedPoints: 0,
+            maxPoints: q.points,
+            isCorrect: false,
+            feedback: "Sin respuesta evaluada.",
+          }
+      );
+
+      const totalScore = Math.max(
+        0,
+        Math.min(
+          100,
+          questionResults.reduce((acc, r) => acc + r.earnedPoints, 0)
+        )
+      );
+      const passingScore = Number(examModel.passingScore) || 60;
+      const passed = totalScore >= passingScore;
+
+      if (!overallFeedback) {
+        overallFeedback = passed
+          ? `Alcanzaste ${totalScore}/100 puntos y aprobaste el modelo de parcial (mínimo ${passingScore}/100).`
+          : `Obtuviste ${totalScore}/100 puntos. Necesitás al menos ${passingScore}/100 para aprobar la materia; revisá las correcciones y volvé a intentarlo.`;
+      }
+
+      return res.json({
+        submittedAt: new Date().toISOString(),
+        totalScore,
+        passed,
+        overallFeedback,
+        answers,
+        questionResults,
       });
     } catch (err) {
       const { status, message } = extractGeminiError(err);

@@ -5,6 +5,7 @@ import {
   BookOpen,
   BookOpenText,
   Calculator,
+  ClipboardCheck,
   ArrowRight,
   Wand2,
   FileDown,
@@ -12,11 +13,12 @@ import {
   Moon,
   Eye,
 } from 'lucide-react';
-import { StudyPlan, StudyTab } from '../types/study';
+import { ExamAttemptResult, ExamModel, StudyPlan, StudyTab } from '../types/study';
 import { MathText } from './MathText';
 import { RevealableFormula } from './RevealableFormula';
 import { SummaryPdfSheet } from './SummaryPdfSheet';
 import { VisualDiagramCard } from './VisualDiagramCard';
+import { ExamModelsView } from './ExamModelsView';
 import { exportBlocksToPdf } from '../utils/exportPdf';
 
 type SummarySectionTarget = 'all' | 'concepts' | 'visuals' | 'formulas' | 'traps';
@@ -24,6 +26,9 @@ type SummarySectionTarget = 'all' | 'concepts' | 'visuals' | 'formulas' | 'traps
 interface ExamSummaryViewProps {
   plan: StudyPlan;
   onNavigateTab: (tab: StudyTab) => void;
+  onAddExamModel: (model: ExamModel) => void;
+  onSaveExamAttempt: (modelId: string, attempt: ExamAttemptResult) => void;
+  onDeleteExamModel: (modelId: string) => void;
   readingMode?: boolean;
   onToggleReadingMode?: () => void;
   nightMode?: boolean;
@@ -34,6 +39,9 @@ interface ExamSummaryViewProps {
 export function ExamSummaryView({
   plan,
   onNavigateTab,
+  onAddExamModel,
+  onSaveExamAttempt,
+  onDeleteExamModel,
   readingMode: controlledReadingMode,
   onToggleReadingMode,
   nightMode: controlledNightMode,
@@ -43,6 +51,7 @@ export function ExamSummaryView({
   const [activeSection, setActiveSection] = useState<SummarySectionTarget>('all');
   const [highlightedSection, setHighlightedSection] = useState<SummarySectionTarget | null>(null);
   const [revealedFormulaIds, setRevealedFormulaIds] = useState<string[]>([]);
+  const [showExamModels, setShowExamModels] = useState(false);
   const [localReadingMode, setLocalReadingMode] = useState(false);
   const [localNightMode, setLocalNightMode] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -59,6 +68,7 @@ export function ExamSummaryView({
     setActiveSection('all');
     setHighlightedSection(null);
     setRevealedFormulaIds([]);
+    setShowExamModels(false);
   }, [plan.id]);
 
   useEffect(() => {
@@ -182,6 +192,20 @@ export function ExamSummaryView({
     : isReadingMode
       ? 'text-[#8B5220]'
       : 'text-blue-700';
+
+  if (showExamModels) {
+    return (
+      <ExamModelsView
+        plan={plan}
+        onBackToSummary={() => setShowExamModels(false)}
+        onAddExamModel={onAddExamModel}
+        onSaveAttempt={onSaveExamAttempt}
+        onDeleteExamModel={onDeleteExamModel}
+        isReadingMode={isReadingMode}
+        isNightMode={isNightMode}
+      />
+    );
+  }
 
   return (
     <div
@@ -382,6 +406,16 @@ export function ExamSummaryView({
                   </button>
                 ))}
             </nav>
+
+            {/* Separate Blue CTA Button: Ejemplos de parciales */}
+            <button
+              type="button"
+              onClick={() => setShowExamModels(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold transition-colors whitespace-nowrap shrink-0 font-sans shadow-xs"
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 shrink-0" />
+              <span>Ejemplos de parciales</span>
+            </button>
           </div>
         </div>
 

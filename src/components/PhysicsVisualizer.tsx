@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { ExerciseVisualConfig } from '../types/study';
+import { VisualDiagramCard } from './VisualDiagramCard';
 
 interface PhysicsVisualizerProps {
   visualConfig?: ExerciseVisualConfig;
   highlightElement?: string;
+  highlightPartNumber?: number;
   currentStepIndex: number;
   totalSteps: number;
   stepTitles: string[];
@@ -14,6 +16,7 @@ interface PhysicsVisualizerProps {
 export function PhysicsVisualizer({
   visualConfig,
   highlightElement,
+  highlightPartNumber,
   currentStepIndex,
   totalSteps,
   stepTitles,
@@ -31,6 +34,15 @@ export function PhysicsVisualizer({
   // Reset helper when problem parameters differ
   const effectiveAngle = simAngle;
   const effectiveVel = simVel;
+
+  if (type === 'visual_diagram' && visualConfig?.visualExample) {
+    return (
+      <VisualDiagramCard
+        example={visualConfig.visualExample}
+        highlightedPartNumber={highlightPartNumber}
+      />
+    );
+  }
 
   if (type === 'inclined_plane') {
     const rad = (effectiveAngle * Math.PI) / 180;

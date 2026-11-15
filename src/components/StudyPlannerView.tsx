@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Check, Clock, Play, Pause, RotateCcw, ArrowRight, SlidersHorizontal } from 'lucide-react';
-import { StudyBlock, StudyPlan, StudyTab } from '../types/study';
+import { ExamReminderConfig, StudyBlock, StudyPlan, StudyTab } from '../types/study';
 import { MathText } from './MathText';
+import { ExamReminderSettings } from './ExamReminderSettings';
 
 interface StudyPlannerViewProps {
   plan: StudyPlan;
   onToggleBlock: (blockId: string) => void;
   onNavigateTab: (tab: StudyTab) => void;
   onRebalanceTime: (newTotalMinutes: number) => void;
+  onUpdateExamDate: (examDate: string) => void;
+  onUpdateReminderConfig: (config: ExamReminderConfig) => void;
+  onSendTestAlert: () => void;
 }
 
 const CATEGORY_LABELS: Record<StudyBlock['category'], string> = {
@@ -42,6 +46,9 @@ export function StudyPlannerView({
   onToggleBlock,
   onNavigateTab,
   onRebalanceTime,
+  onUpdateExamDate,
+  onUpdateReminderConfig,
+  onSendTestAlert,
 }: StudyPlannerViewProps) {
   const [activeTimerBlockId, setActiveTimerBlockId] = useState<string | null>(
     plan.studyBlocks.find((b) => !b.completed && b.category !== 'descanso')?.id ??
@@ -223,6 +230,16 @@ export function StudyPlannerView({
           </p>
         </div>
       </div>
+
+      {/* Exam Date & Reminders Strip */}
+      <ExamReminderSettings
+        examDate={plan.examDate}
+        reminderConfig={plan.reminderConfig}
+        showDateInput={true}
+        onUpdateExamDate={onUpdateExamDate}
+        onUpdateReminderConfig={onUpdateReminderConfig}
+        onSendTestAlert={onSendTestAlert}
+      />
 
       {/* Study Blocks Schedule */}
       <section className="bg-white border border-slate-200 rounded-xl overflow-hidden">

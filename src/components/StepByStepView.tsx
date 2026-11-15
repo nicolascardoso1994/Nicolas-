@@ -165,6 +165,12 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
   const steps = activeExercise.steps;
   const activeStep = steps[currentStepIdx] ?? steps[0];
   const stepsToRender = showAllSteps ? steps : activeStep ? [activeStep] : [];
+  const isVisualOrTheoretical =
+    activeExercise.visualConfig?.type === 'visual_diagram' ||
+    plan.subjectMode === 'theoretical' ||
+    (!steps.some((s) => Boolean(s.mathLatex && s.mathLatex.trim().length > 0)) &&
+      activeExercise.visualConfig?.type !== 'inclined_plane' &&
+      activeExercise.visualConfig?.type !== 'projectile');
 
   return (
     <div className="space-y-6">
@@ -182,13 +188,13 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              Ejercicio {idx + 1} · {ex.difficulty}
+              {isVisualOrTheoretical ? 'Caso visual' : 'Ejercicio'} {idx + 1} · {ex.difficulty}
             </button>
           ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {onOpenChart && (
+          {onOpenChart && !isVisualOrTheoretical && (
             <button
               type="button"
               disabled={charting}
@@ -315,7 +321,11 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap shrink-0"
           >
             {solverOpen ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-            {solverOpen ? 'Cerrar panel' : 'Resolver mi ejercicio'}
+            {solverOpen
+              ? 'Cerrar panel'
+              : isVisualOrTheoretical
+                ? 'Analizar caso o estructura'
+                : 'Resolver mi ejercicio'}
           </button>
         </div>
       </div>
@@ -328,10 +338,14 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
         >
           <div>
             <h3 className="text-base font-semibold text-slate-900">
-              Cargar ejercicio propio para resolución paso a paso
+              {isVisualOrTheoretical
+                ? 'Cargar tema, estructura o caso práctico para análisis visual'
+                : 'Cargar ejercicio propio para resolución paso a paso'}
             </h3>
             <p className="text-xs text-slate-500">
-              Pegá el enunciado o subí una foto/PDF de tu guía de trabajos prácticos.
+              {isVisualOrTheoretical
+                ? 'Pegá el caso o subí una foto/PDF para descomponer sus partes y mecanismos paso a paso.'
+                : 'Pegá el enunciado o subí una foto/PDF de tu guía de trabajos prácticos.'}
             </p>
           </div>
 
@@ -339,7 +353,11 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
             rows={3}
             value={customStatement}
             onChange={(e) => setCustomStatement(e.target.value)}
-            placeholder="Ej: Un bloque de 4 kg sube por un plano inclinado de 30° empujado por una fuerza horizontal de 50 N..."
+            placeholder={
+              isVisualOrTheoretical
+                ? 'Ej: Explicar las partes anatómicas del riñón y el recorrido de filtración en la nefrona...'
+                : 'Ej: Un bloque de 4 kg sube por un plano inclinado de 30° empujado por una fuerza horizontal de 50 N...'
+            }
             className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
           />
 
@@ -416,18 +434,18 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
             <div className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <h4 className="text-xs font-semibold text-slate-700 mb-2">
-                  Datos conocidos
+                  {isVisualOrTheoretical ? 'Partes y datos clave' : 'Datos conocidos'}
                 </h4>
                 <div className="space-y-1.5">
                   {activeExercise.givenData.map((d, i) => (
                     <div
                       key={i}
-                      className="flex items-center justify-between text-xs bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5"
+                      className="flex items-center justify-between gap-2 text-xs bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5"
                     >
                       <span className="font-mono text-slate-800">
-                        <MathText text={`$${d.symbol}$`} />
+                        <MathText text={isVisualOrTheoretical ? d.symbol : `$${d.symbol}$`} />
                       </span>
-                      <span className="font-mono tabular-nums font-medium text-slate-900">
+                      <span className="font-mono tabular-nums font-medium text-slate-900 text-right">
                         {d.value} {d.unit !== '-' ? d.unit : ''}
                       </span>
                     </div>
@@ -437,7 +455,7 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
 
               <div>
                 <h4 className="text-xs font-semibold text-slate-700 mb-2">
-                  Incógnitas
+                  {isVisualOrTheoretical ? 'Qué identificar' : 'Incógnitas'}
                 </h4>
                 <ul className="space-y-1.5">
                   {activeExercise.unknowns.map((u, i) => (
@@ -457,6 +475,7 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
             key={activeExercise.id}
             visualConfig={activeExercise.visualConfig}
             highlightElement={activeStep?.highlightElement}
+            highlightPartNumber={activeStep?.highlightPartNumber}
             currentStepIndex={currentStepIdx}
             totalSteps={steps.length}
             stepTitles={steps.map((s) => s.title)}
@@ -569,7 +588,9 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
                   {/* Thinking prompt */}
                   <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-3.5">
                     <span className="text-xs font-semibold text-blue-800 block mb-1">
-                      Qué pensar antes de calcular
+                      {isVisualOrTheoretical
+                        ? 'Qué observar en el esquema'
+                        : 'Qué pensar antes de calcular'}
                     </span>
                     <p className="text-sm text-slate-800 leading-relaxed">
                       <MathText text={step.thinkingPrompt} />
@@ -577,7 +598,7 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
                   </div>
 
                   {/* Math Formula */}
-                  {step.mathLatex && (
+                  {step.mathLatex && step.mathLatex.trim().length > 0 && (
                     <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-3.5 overflow-x-auto text-slate-900">
                       <MathBlock latex={step.mathLatex} displayMode={true} />
                     </div>
@@ -656,7 +677,9 @@ export function StepByStepView({ plan, onAddExercise, onOpenChart }: StepByStepV
           {(showAllSteps || currentStepIdx >= steps.length - 1) && (
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-5 space-y-1.5">
               <span className="text-xs font-semibold text-emerald-800">
-                Respuesta final verificada
+                {isVisualOrTheoretical
+                  ? 'Síntesis visual verificada'
+                  : 'Respuesta final verificada'}
               </span>
               <p className="text-sm md:text-base font-medium text-slate-900 leading-relaxed">
                 <MathText text={activeExercise.finalAnswer} />

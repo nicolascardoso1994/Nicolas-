@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Upload, X, FileText } from 'lucide-react';
 import { StudyPlan, UploadedFilePayload } from '../types/study';
+import { DEFAULT_REMINDER_CONFIG, addDaysToLocalDate } from '../utils/examReminders';
 
 interface NewPlanModalProps {
   open: boolean;
@@ -12,6 +13,7 @@ const FOLDER_OPTIONS = [
   'Física',
   'Matemática',
   'Química',
+  'Anatomía',
   'Biología',
   'Programación',
   'Economía',
@@ -19,6 +21,14 @@ const FOLDER_OPTIONS = [
 ];
 
 const PRESET_TEMPLATES = [
+  {
+    label: 'Anatomía · Corazón y Sistema Nervioso',
+    subject: 'Anatomía Humana — Corazón, Vasos y Neurona',
+    folder: 'Anatomía',
+    notes:
+      'Temas del parcial: Anatomía macroscópica del corazón (aurículas, ventrículos, válvulas auriculoventriculares y sigmoideas, aorta, venas cavas), circulación mayor y menor. Estructura de la neurona (soma, dendritas, axón, vaina de mielina y botones sinápticos) y conducción del impulso.',
+    focusHint: 'Identificar partes anatómicas, recorridos y relaciones espaciales sin fórmulas innecesarias',
+  },
   {
     label: 'Física I · Leyes de Newton y Energía',
     subject: 'Física I — Dinámica y Trabajo-Energía',
@@ -152,7 +162,15 @@ export function NewPlanModal({ open, onClose, onCreated }: NewPlanModalProps) {
       }
       const resolvedFolder =
         folder === '__custom__' ? customFolder.trim() || 'General' : folder;
-      onCreated({ ...data, folder: resolvedFolder });
+      onCreated({
+        ...data,
+        folder: resolvedFolder,
+        examDate: data.examDate || addDaysToLocalDate(daysAvailable),
+        reminderConfig: {
+          ...DEFAULT_REMINDER_CONFIG,
+          daysBefore: [...DEFAULT_REMINDER_CONFIG.daysBefore],
+        },
+      });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al conectar con el servidor.');

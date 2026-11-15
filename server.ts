@@ -81,9 +81,86 @@ function extractGeminiError(err: unknown): { status: number; message: string } {
   };
 }
 
+const visualDiagramPartSchema = {
+  type: Type.OBJECT,
+  properties: {
+    number: { type: Type.INTEGER, description: "Número secuencial 1, 2, 3..." },
+    label: { type: Type.STRING, description: "Nombre anatómico, biológico o conceptual exacto" },
+    location: { type: Type.STRING, description: "Ubicación espacial o región dentro del esquema" },
+    description: { type: Type.STRING, description: "Qué es y qué función cumple de forma clara" },
+    examTip: { type: Type.STRING, description: "Dato clave que suelen evaluar en parciales o finales" },
+    x: { type: Type.NUMBER, description: "Coordenada horizontal del pin sobre lienzo 0..400" },
+    y: { type: Type.NUMBER, description: "Coordenada vertical del pin sobre lienzo 0..260" },
+  },
+  required: ["number", "label", "location", "description", "examTip", "x", "y"],
+};
+
+const svgShapePrimitiveSchema = {
+  type: Type.OBJECT,
+  properties: {
+    kind: {
+      type: Type.STRING,
+      description: "Uno de: ellipse, rect, circle, line, path, polygon",
+    },
+    fill: { type: Type.STRING },
+    stroke: { type: Type.STRING },
+    strokeWidth: { type: Type.NUMBER },
+    cx: { type: Type.NUMBER },
+    cy: { type: Type.NUMBER },
+    rx: { type: Type.NUMBER },
+    ry: { type: Type.NUMBER },
+    r: { type: Type.NUMBER },
+    x: { type: Type.NUMBER },
+    y: { type: Type.NUMBER },
+    width: { type: Type.NUMBER },
+    height: { type: Type.NUMBER },
+    x1: { type: Type.NUMBER },
+    y1: { type: Type.NUMBER },
+    x2: { type: Type.NUMBER },
+    y2: { type: Type.NUMBER },
+    d: { type: Type.STRING },
+    points: { type: Type.STRING },
+  },
+  required: ["kind"],
+};
+
+const visualExampleSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    categoryLabel: {
+      type: Type.STRING,
+      description: "Ej: Ejemplo anatómico, Esquema celular, Mapa de proceso",
+    },
+    caption: { type: Type.STRING },
+    templateId: {
+      type: Type.STRING,
+      description:
+        "Elegí la plantilla más acorde: heart, cell, neuron, respiratory, nephron, bone, o custom si es otra estructura.",
+    },
+    shapes: {
+      type: Type.ARRAY,
+      description:
+        "Solo completar si templateId es custom: formas vectoriales limpias en lienzo 400x260 que representen la estructura.",
+      items: svgShapePrimitiveSchema,
+    },
+    parts: {
+      type: Type.ARRAY,
+      description: "4 a 6 partes clave ubicadas sobre el diagrama (x en 20..380, y en 20..240).",
+      items: visualDiagramPartSchema,
+    },
+  },
+  required: ["title", "categoryLabel", "caption", "templateId", "parts"],
+};
+
 const studyPlanResponseSchema = {
   type: Type.OBJECT,
   properties: {
+    subjectMode: {
+      type: Type.STRING,
+      description:
+        "Exactamente 'theoretical' si la materia es teórica/descriptiva/anatómica/biológica sin cuentas matemáticas obligatorias, o 'quantitative' si requiere cálculos, despejes o ecuaciones.",
+    },
     executiveSummary: {
       type: Type.STRING,
       description:
@@ -92,18 +169,24 @@ const studyPlanResponseSchema = {
     summarySections: {
       type: Type.ARRAY,
       description:
-        "Resumen universitario ordenado por secciones numeradas (ej: 1. Conexión entre unidades, 2. Núcleo conceptual, 3. Criterios de aplicación). Cada sección lleva título claro, explicación amigable debajo del título y, si incluye una fórmula o ecuación clave, se coloca aparte en formulaLatex.",
+        "Resumen universitario ordenado por secciones numeradas (ej: 1. Conexión entre unidades, 2. Núcleo conceptual, 3. Criterios de aplicación). Cada sección lleva título claro, explicación amigable debajo del título y, SOLO si la materia es cuantitativa y hay una fórmula clave, se coloca en formulaLatex.",
       items: {
         type: Type.OBJECT,
         properties: {
           order: { type: Type.INTEGER },
           title: { type: Type.STRING, description: "Título breve y claro de la sección sin el número (ej: Conexión entre unidades)" },
-          content: { type: Type.STRING, description: "Texto ordenado y fácil de leer. Si mencionás una ecuación importante dentro del texto, ponela en párrafo aparte con $$...$$ o en formulaLatex." },
-          formulaLatex: { type: Type.STRING, description: "Ecuación principal de la sección en LaTeX puro (sin signos $), opcional si aplica." },
-          formulaCaption: { type: Type.STRING, description: "Breve aclaración de lectura rápida sobre la fórmula." },
+          content: { type: Type.STRING, description: "Texto ordenado y fácil de leer." },
+          formulaLatex: { type: Type.STRING, description: "Ecuación principal en LaTeX puro (sin signos $), SOLO si la materia requiere cuentas." },
+          formulaCaption: { type: Type.STRING, description: "Breve aclaración sobre la fórmula (si aplica)." },
         },
         required: ["order", "title", "content"],
       },
+    },
+    visualExamples: {
+      type: Type.ARRAY,
+      description:
+        "Para materias teóricas, anatómicas o biológicas (subjectMode = theoretical), incluí 2 ejemplos gráficos/visuales con sus partes señaladas. Opcional (0-1) para materias cuantitativas.",
+      items: visualExampleSchema,
     },
     studyBlocks: {
       type: Type.ARRAY,
@@ -248,13 +331,15 @@ const studyPlanResponseSchema = {
             properties: {
               type: {
                 type: Type.STRING,
-                description: "Uno de: inclined_plane, projectile, circuit_or_generic, none",
+                description:
+                  "Uno de: inclined_plane, projectile, visual_diagram, circuit_or_generic, none. Usá visual_diagram para anatomía, biología y materias teóricas.",
               },
               angleDeg: { type: Type.NUMBER },
               massKg: { type: Type.NUMBER },
               mu: { type: Type.NUMBER },
               velocityMs: { type: Type.NUMBER },
               caption: { type: Type.STRING },
+              visualExample: visualExampleSchema,
             },
             required: ["type"],
           },
@@ -266,12 +351,20 @@ const studyPlanResponseSchema = {
                 stepNumber: { type: Type.INTEGER },
                 title: { type: Type.STRING },
                 thinkingPrompt: { type: Type.STRING },
-                mathLatex: { type: Type.STRING, description: "Ecuaciones en LaTeX puro sin $$" },
+                mathLatex: {
+                  type: Type.STRING,
+                  description:
+                    "Ecuaciones en LaTeX puro sin $$ SOLO si el tema requiere cuentas matemáticas; en materias teóricas/anatómicas dejalo vacío \"\".",
+                },
                 explanation: { type: Type.STRING },
                 watchOut: { type: Type.STRING },
                 highlightElement: {
                   type: Type.STRING,
                   description: "Uno de: axes, gravity, normal, friction, applied, result, energy",
+                },
+                highlightPartNumber: {
+                  type: Type.INTEGER,
+                  description: "Número de parte (1..6) del visualExample que corresponde a este paso.",
                 },
                 quickCheck: {
                   type: Type.OBJECT,
@@ -288,7 +381,6 @@ const studyPlanResponseSchema = {
                 "stepNumber",
                 "title",
                 "thinkingPrompt",
-                "mathLatex",
                 "explanation",
                 "watchOut",
               ],
@@ -310,6 +402,7 @@ const studyPlanResponseSchema = {
     },
   },
   required: [
+    "subjectMode",
     "executiveSummary",
     "studyBlocks",
     "keyConcepts",
@@ -351,6 +444,7 @@ const singleExerciseSchema = {
         mu: { type: Type.NUMBER },
         velocityMs: { type: Type.NUMBER },
         caption: { type: Type.STRING },
+        visualExample: visualExampleSchema,
       },
       required: ["type"],
     },
@@ -366,6 +460,7 @@ const singleExerciseSchema = {
           explanation: { type: Type.STRING },
           watchOut: { type: Type.STRING },
           highlightElement: { type: Type.STRING },
+          highlightPartNumber: { type: Type.INTEGER },
           quickCheck: {
             type: Type.OBJECT,
             properties: {
@@ -381,7 +476,6 @@ const singleExerciseSchema = {
           "stepNumber",
           "title",
           "thinkingPrompt",
-          "mathLatex",
           "explanation",
           "watchOut",
         ],
@@ -603,21 +697,28 @@ MATERIAL CARGADO POR EL ESTUDIANTE:
 ${notesText ? notesText : "(El estudiante no pegó texto adicional; revisá los archivos adjuntos o elaborá sobre la materia y tema indicados con rigor universitario.)"}
 
 INSTRUCCIONES ESTRICTAS:
-1. **Plan de estudio por bloques (studyBlocks)**: La suma de \`durationMinutes\` de todos los bloques debe aproximarse lo máximo posible a ${totalMinutes} minutos (idealmente exactamente ${totalMinutes} min). Dividí el tiempo en sesiones claras (\`Día 1 · Bloque 1\`, etc.) alternando teoría, práctica guiada, repaso y simulacro (y descansos breves de 10-15 min si una jornada supera los 90 minutos).
+0. **Clasificación de la asignatura (\`subjectMode\`) — REGLA FUNDAMENTAL**:
+   - Evaluá primero si la materia requiere cuentas, cálculos numéricos o ecuaciones matemáticas (\`quantitative\`, ej. Física, Matemática, Química, Estadística, Finanzas) **O** si es una materia principalmente teórica, descriptiva o morfológica (\`theoretical\`, ej. **Anatomía, Biología, Histología, Embriología, Fisiología descriptiva, Medicina, Enfermería, Historia, Derecho, Psicología, Sociología, Filosofía, Literatura**).
+   - **SI \`subjectMode === "theoretical"\`**:
+     - **PROHIBIDO inventar cuentas, números artificiales o fórmulas matemáticas**. Dejá \`formulas\` como arreglo vacío \`[]\`, no pongas ecuaciones en \`formulaLatex\`, y dejá \`steps[].mathLatex\` vacío \`""\`.
+     - En su lugar, generá **ejemplos gráficos y visuales concretos** en \`visualExamples\` (2 esquemas interactivos) y usá \`visualConfig.type = "visual_diagram"\` con su \`visualExample\` en cada elemento de \`exercises\`.
+     - Por ejemplo, en Anatomía mostrá partes anatómicas reales con sus pines (x: 20..380, y: 20..240), ubicación, función y dato de examen; en Biología mostrá organelas, membranas o fases celulares; en materias humanísticas mostrá esquemas de actores, poderes o etapas históricas usando \`templateId: "custom"\` y \`shapes\` vectoriales simples.
+     - Usá \`templateId\` (\`heart\`, \`cell\`, \`neuron\`, \`respiratory\`, \`nephron\`, \`bone\`) cuando el tema coincida con alguna de esas estructuras para mostrar una ilustración anatómica de alta precisión con los pines ubicados sobre cada región; si es otro órgano o tema teórico, usá \`templateId: "custom"\` y dibujá formas limpias en \`shapes\` (400×260) alineadas con las coordenadas \`(x, y)\` de \`parts\`.
+
+1. **Plan de estudio por bloques (studyBlocks)**: La suma de \`durationMinutes\` de todos los bloques debe aproximarse lo máximo posible a ${totalMinutes} minutos (idealmente exactamente ${totalMinutes} min). Dividí el tiempo en sesiones claras (\`Día 1 · Bloque 1\`, etc.) alternando teoría, práctica o análisis visual, repaso y autoevaluación (y descansos breves de 10-15 min si supera 90 minutos).
 2. **Resumen optimizado para examen**:
-   - \`summarySections\`: Creá 3 a 4 secciones ordenadas (por ejemplo: 1. Conexión entre unidades, 2. Leyes o pilares centrales, 3. Criterios prácticos para resolver el examen). Cada sección debe tener un título claro arriba y el desarrollo ordenado debajo. Si aparece una fórmula o ecuación clave en una sección, ponela aparte en \`formulaLatex\` (o en un párrafo aparte con \`$$...$$\`) para que no quede escondida dentro del texto.
-   - \`keyConcepts\`: 4 a 6 conceptos centrales con definición académica rigurosa + explicación en palabras simples + ejemplo sencillo cotidiano.
-   - \`formulas\`: Si la materia usa ecuaciones, leyes o reglas formales, incluí 3 a 6 fórmulas en LaTeX puro (sin signos \`$\`), explicando cada variable con su unidad SI, cuándo usarla y cuándo NO usarla. Si la materia es humanística/teórica, incluí modelos analíticos, marcos o relaciones estructurales clave en formato limpio.
+   - \`summarySections\`: Creá 3 a 4 secciones ordenadas (por ejemplo: 1. Conexión entre unidades, 2. Núcleo conceptual, 3. Criterios prácticos para el examen). Cada sección debe tener título claro arriba y desarrollo ordenado debajo. Solo si \`subjectMode === "quantitative"\` y hay una fórmula clave, ponela aparte en \`formulaLatex\`.
+   - \`keyConcepts\`: 4 a 6 conceptos centrales con definición académica rigurosa + explicación en palabras simples + ejemplo cotidiano concreto.
+   - \`formulas\`: SOLO si \`subjectMode === "quantitative"\`, incluí 3 a 6 fórmulas en LaTeX puro con variables SI, cuándo usarla y cuándo NO usarla. Si \`subjectMode === "theoretical"\`, devolvé \`[]\`.
    - \`examTraps\`: 3 a 4 trampas típicas de examen universitario y cómo evitarlas rápido.
 3. **Guía de repaso detallada**:
-   - \`guideSections\`: 3 a 5 secciones progresivas ordenadas de lo fundamental a lo complejo, lectura ágil, con ejemplo concreto y idea clave para retener.
-   - \`masteryChecklist\`: 5 a 7 afirmaciones verificables ("Sé identificar...", "Puedo deducir...").
+   - \`guideSections\`: 3 a 5 secciones progresivas ordenadas de lo fundamental a lo complejo, con ejemplo concreto e idea clave para retener.
+   - \`masteryChecklist\`: 5 a 7 afirmaciones verificables ("Sé identificar...", "Puedo explicar...").
    - \`quizQuestions\`: 4 preguntas tipo parcial con 4 opciones cada una, \`correctIndex\` (0-3) y explicación breve y clara.
-4. **Resolución de ejercicios paso a paso**:
-   - \`exercises\`: Creá 2 ejercicios universitarios representativos del material (si el alumno cargó problemas en su texto o archivos, usalos directamente; si no, creá 2 ejercicios clásicos de parcial de la materia).
-   - Cada ejercicio debe llevar al estudiante **paso a paso** (4 a 6 pasos): qué pensar antes de calcular, ecuaciones en LaTeX puro en \`mathLatex\`, explicación clara, alerta \`watchOut\`, y una pregunta corta \`quickCheck\` en al menos 2 pasos por ejercicio para comprobar comprensión.
-   - Si el ejercicio es de física mecánica (plano inclinado o tiro parabólico/proyectil), completá \`visualConfig\` con \`inclined_plane\` o \`projectile\` y los valores numéricos aproximados; para otras áreas usá \`circuit_or_generic\` o \`none\`.
-5. Cuando escribas fórmulas dentro de campos de texto normal (fuera de \`latex\`, \`formulaLatex\` o \`mathLatex\`), si es una ecuación importante ponela en párrafo aparte entre \`$$...$$\` para que se resalte en negrita. En \`formulas[].latex\`, \`summarySections[].formulaLatex\` y \`steps[].mathLatex\`, devolvé SOLO el código LaTeX sin delimitadores \`$\` o \`$$\`.
+4. **Paso a Paso (\`exercises\`)**:
+   - Si \`subjectMode === "quantitative"\`: Creá 2 ejercicios universitarios representativos resueltos paso a paso (4 a 6 pasos con \`mathLatex\`, \`thinkingPrompt\`, \`watchOut\`, \`quickCheck\` y \`visualConfig\` \`inclined_plane\`, \`projectile\`, \`circuit_or_generic\` o \`none\`).
+   - Si \`subjectMode === "theoretical"\`: Creá 2 **casos visuales / recorridos anatómicos o conceptuales paso a paso** (SIN cuentas ni \`mathLatex\`). Cada caso lleva \`visualConfig.type = "visual_diagram"\`, su \`visualExample\` con 4-6 partes anatómicas o conceptuales señaladas, \`givenData\` listando las estructuras/componentes clave, \`unknowns\` listando qué debe saber identificar el alumno, y 4 a 5 pasos (\`steps\`) donde cada paso apunta a una parte (\`highlightPartNumber\`) y explica qué observar, su función y errores típicos de examen, con \`quickCheck\` en al menos 2 pasos.
+5. En materias cuantitativas, cuando escribas ecuaciones importantes en texto normal ponelas en párrafo aparte entre \`$$...$$\`. En \`formulas[].latex\`, \`summarySections[].formulaLatex\` y \`steps[].mathLatex\`, devolvé SOLO LaTeX puro sin signos \`$\`.
 `;
 
       const contents = buildContentParts(prompt, Array.isArray(files) ? files : []);
@@ -630,7 +731,7 @@ INSTRUCCIONES ESTRICTAS:
           responseMimeType: "application/json",
           responseSchema: studyPlanResponseSchema,
           systemInstruction:
-            "Respondé únicamente en español rioplatense/académico neutro claro, preciso y directo. Mantené rigor universitario con explicaciones concretas y livianas para estudiar rápido.",
+            "Respondé únicamente en español claro, preciso y directo. Mantené rigor universitario con explicaciones concretas. Nunca inventes fórmulas ni cuentas matemáticas en materias teóricas, anatómicas o biológicas descriptivas: usá ejemplos visuales con partes señaladas.",
         },
       });
 
@@ -638,9 +739,38 @@ INSTRUCCIONES ESTRICTAS:
       const parsed = JSON.parse(rawJson);
 
       const nowId = `plan-${Date.now()}`;
+      const resolvedMode =
+        parsed.subjectMode === "theoretical" ||
+        (!Array.isArray(parsed.formulas) || parsed.formulas.length === 0)
+          ? "theoretical"
+          : "quantitative";
+
+      const normalizeVisualExample = (v: Record<string, unknown> | undefined, fallbackId: string) => {
+        if (!v || !Array.isArray(v.parts) || v.parts.length === 0) return undefined;
+        return {
+          id: fallbackId,
+          title: String(v.title ?? "Esquema visual"),
+          categoryLabel: String(v.categoryLabel ?? "Ejemplo gráfico"),
+          caption: String(v.caption ?? ""),
+          templateId: String(v.templateId ?? "custom"),
+          shapes: Array.isArray(v.shapes) ? v.shapes : undefined,
+          parts: v.parts.map((p: Record<string, unknown>, pIdx: number) => ({
+            id: `${fallbackId}-part-${pIdx + 1}`,
+            number: Number(p.number) || pIdx + 1,
+            label: String(p.label ?? `Parte ${pIdx + 1}`),
+            location: String(p.location ?? ""),
+            description: String(p.description ?? ""),
+            examTip: String(p.examTip ?? ""),
+            x: Math.min(380, Math.max(20, Number(p.x) || 80 + pIdx * 55)),
+            y: Math.min(240, Math.max(20, Number(p.y) || 120)),
+          })),
+        };
+      };
+
       const normalized = {
         id: nowId,
         subject: subject.trim(),
+        subjectMode: resolvedMode,
         examType,
         createdAt: new Date().toISOString(),
         totalMinutes,
@@ -648,6 +778,13 @@ INSTRUCCIONES ESTRICTAS:
         hoursPerDay: safeHoursPerDay,
         pace,
         executiveSummary: parsed.executiveSummary ?? "",
+        visualExamples: Array.isArray(parsed.visualExamples)
+          ? parsed.visualExamples
+              .map((v: Record<string, unknown>, idx: number) =>
+                normalizeVisualExample(v, `vis-${nowId}-${idx}`)
+              )
+              .filter(Boolean)
+          : [],
         summarySections: (parsed.summarySections ?? []).map(
           (s: Record<string, unknown>, idx: number) => ({
             order: Number(s.order) || idx + 1,
@@ -722,20 +859,33 @@ INSTRUCCIONES ESTRICTAS:
             explanation: String(q.explanation ?? ""),
           })
         ),
-        exercises: (parsed.exercises ?? []).map((ex: Record<string, unknown>, idx: number) => ({
-          id: `ex-${nowId}-${idx}`,
-          title: String(ex.title ?? `Ejercicio ${idx + 1}`),
-          topic: String(ex.topic ?? subject.trim()),
-          difficulty: ["Base", "Parcial", "Integrador"].includes(String(ex.difficulty))
-            ? String(ex.difficulty)
-            : "Parcial",
-          statement: String(ex.statement ?? ""),
-          givenData: Array.isArray(ex.givenData) ? ex.givenData : [],
-          unknowns: Array.isArray(ex.unknowns) ? ex.unknowns.map(String) : [],
-          visualConfig: ex.visualConfig ?? { type: "none" },
-          steps: Array.isArray(ex.steps) ? ex.steps : [],
-          finalAnswer: String(ex.finalAnswer ?? ""),
-        })),
+        exercises: (parsed.exercises ?? []).map((ex: Record<string, unknown>, idx: number) => {
+          const vc = (ex.visualConfig ?? { type: "none" }) as Record<string, unknown>;
+          const normalizedVisualExample = vc.visualExample
+            ? normalizeVisualExample(
+                vc.visualExample as Record<string, unknown>,
+                `ex-vis-${nowId}-${idx}`
+              )
+            : undefined;
+          return {
+            id: `ex-${nowId}-${idx}`,
+            title: String(ex.title ?? `Caso ${idx + 1}`),
+            topic: String(ex.topic ?? subject.trim()),
+            difficulty: ["Base", "Parcial", "Integrador"].includes(String(ex.difficulty))
+              ? String(ex.difficulty)
+              : "Parcial",
+            statement: String(ex.statement ?? ""),
+            givenData: Array.isArray(ex.givenData) ? ex.givenData : [],
+            unknowns: Array.isArray(ex.unknowns) ? ex.unknowns.map(String) : [],
+            visualConfig: {
+              ...vc,
+              type: String(vc.type ?? "none"),
+              visualExample: normalizedVisualExample,
+            },
+            steps: Array.isArray(ex.steps) ? ex.steps : [],
+            finalAnswer: String(ex.finalAnswer ?? ""),
+          };
+        }),
       };
 
       return res.json(normalized);
@@ -754,21 +904,20 @@ INSTRUCCIONES ESTRICTAS:
 
       const ai = getAiClient();
       const prompt = `
-Resolvé paso a paso el siguiente ejercicio universitario de la materia "${subject}" para que el estudiante aprenda el razonamiento completo, no solo el resultado.
+Analizá paso a paso el siguiente problema, caso o estructura de la materia "${subject}" para que el estudiante comprenda el razonamiento completo.
 
-ENUNCIADO / NOTA:
-${statement || "(Revisá la imagen o documento adjunto para extraer el enunciado completo.)"}
+ENUNCIADO / TEMA:
+${statement || "(Revisá la imagen o documento adjunto para extraer el contenido completo.)"}
 
-REQUISITOS:
-- Descomponé la resolución en 4 a 6 pasos lógicos y claros.
-- En cada paso incluí:
-  1. \`thinkingPrompt\`: Qué debe preguntarse o plantear el estudiante antes de hacer cuentas.
-  2. \`mathLatex\`: Las ecuaciones del paso en LaTeX puro (sin \`$$\` alrededor).
-  3. \`explanation\`: Explicación ágil y concreta de por qué se aplica esa ecuación o despeje.
-  4. \`watchOut\`: Un error clásico que conviene revisar en este punto (signos, unidades, sistema de referencia).
-  5. \`quickCheck\`: Incluí una pregunta rápida de opción múltiple en al menos 3 pasos para que el estudiante verifique si entendió el paso.
-- Si es un problema de plano inclinado o proyectil, configurá \`visualConfig\` adecuadamente (\`inclined_plane\` o \`projectile\`) con sus parámetros numéricos. Si no, usá \`circuit_or_generic\` o \`none\`.
-- Verificá todos los cálculos numéricos y las unidades en Sistema Internacional (SI) o las que pida el enunciado.
+REQUISITOS IMPORTANTES SEGÚN EL TIPO DE MATERIA:
+- Si la materia o consigna NO requiere cálculos matemáticos (por ejemplo Anatomía, Biología, Histología, Derecho, Historia o temas teóricos/morfológicos):
+  - **NO inventes cuentas ni fórmulas matemáticas**: dejá \`mathLatex\` como cadena vacía \`""\`.
+  - Usá \`visualConfig.type = "visual_diagram"\` y completá \`visualConfig.visualExample\` con un esquema claro (\`templateId\`: \`heart\`, \`cell\`, \`neuron\`, \`respiratory\`, \`nephron\`, \`bone\` o \`custom\` con \`shapes\`) y 4 a 6 \`parts\` reales con coordenadas sobre 400×260.
+  - Descomponé el tema en 4 a 5 pasos visuales/conceptuales conectando cada paso con \`highlightPartNumber\` (1..6).
+- Si la materia SÍ requiere cálculos (Física, Matemática, Química cuantitativa):
+  - Descomponé en 4 a 6 pasos con ecuaciones en \`mathLatex\` (LaTeX puro sin \`$$\`), \`thinkingPrompt\`, \`watchOut\` y verificaciones SI.
+  - Si es plano inclinado o proyectil, configurá \`visualConfig\` (\`inclined_plane\` o \`projectile\`).
+- En todos los casos incluí \`quickCheck\` en al menos 2-3 pasos para que el alumno compruebe lo aprendido.
 `;
 
       const contents = buildContentParts(prompt, Array.isArray(files) ? files : []);
@@ -780,14 +929,16 @@ REQUISITOS:
           responseMimeType: "application/json",
           responseSchema: singleExerciseSchema,
           systemInstruction:
-            "Sos un docente universitario de ciencias exactas y tutor didáctico. Explicás con precisión matemática, unidades consistentes y lenguaje claro en español.",
+            "Sos un docente universitario claro y visual. Si la materia es teórica, anatómica o biológica sin cálculos, explicás con esquemas visuales y partes anatómicas reales sin inventar matemática; si es cuantitativa, explicás con precisión matemática en español.",
         },
       });
 
       const parsed = JSON.parse((response.text ?? "{}").trim());
+      const customVc = (parsed.visualConfig ?? { type: "none" }) as Record<string, unknown>;
+      const customVis = customVc.visualExample as Record<string, unknown> | undefined;
       return res.json({
         id: `ex-custom-${Date.now()}`,
-        title: parsed.title ?? "Ejercicio resuelto paso a paso",
+        title: parsed.title ?? "Guía visual paso a paso",
         topic: parsed.topic ?? subject,
         difficulty: ["Base", "Parcial", "Integrador"].includes(parsed.difficulty)
           ? parsed.difficulty
@@ -795,7 +946,31 @@ REQUISITOS:
         statement: parsed.statement ?? statement,
         givenData: Array.isArray(parsed.givenData) ? parsed.givenData : [],
         unknowns: Array.isArray(parsed.unknowns) ? parsed.unknowns : [],
-        visualConfig: parsed.visualConfig ?? { type: "none" },
+        visualConfig: {
+          ...customVc,
+          type: String(customVc.type ?? "none"),
+          visualExample:
+            customVis && Array.isArray(customVis.parts)
+              ? {
+                  id: `custom-vis-${Date.now()}`,
+                  title: String(customVis.title ?? parsed.title ?? "Esquema visual"),
+                  categoryLabel: String(customVis.categoryLabel ?? "Ejemplo gráfico"),
+                  caption: String(customVis.caption ?? ""),
+                  templateId: String(customVis.templateId ?? "custom"),
+                  shapes: Array.isArray(customVis.shapes) ? customVis.shapes : undefined,
+                  parts: customVis.parts.map((p: Record<string, unknown>, pIdx: number) => ({
+                    id: `custom-part-${Date.now()}-${pIdx + 1}`,
+                    number: Number(p.number) || pIdx + 1,
+                    label: String(p.label ?? `Parte ${pIdx + 1}`),
+                    location: String(p.location ?? ""),
+                    description: String(p.description ?? ""),
+                    examTip: String(p.examTip ?? ""),
+                    x: Math.min(380, Math.max(20, Number(p.x) || 80 + pIdx * 55)),
+                    y: Math.min(240, Math.max(20, Number(p.y) || 120)),
+                  })),
+                }
+              : undefined,
+        },
         steps: Array.isArray(parsed.steps) ? parsed.steps : [],
         finalAnswer: parsed.finalAnswer ?? "",
       });
@@ -866,12 +1041,16 @@ REQUISITOS:
             .join("\n")
         : "";
 
+      const isTheoreticalNoMath =
+        !Array.isArray(formulas) || formulas.length === 0;
+
       const prompt = `
 Generá un resumen de examen adaptado exactamente al tiempo que le queda al estudiante antes de rendir.
 
 CONTEXTO DEL EXAMEN:
 - Materia: ${subject}
 - Tipo de evaluación: ${examType}
+- Perfil de la materia: ${isTheoreticalNoMath ? "TEÓRICA / VISUAL (NO requiere cuentas ni fórmulas matemáticas)" : "CUANTITATIVA (con fórmulas y cálculos)"}
 - Fecha del examen: ${examDate || "Próxima"}
 - Días restantes: ${safeDays === 0 ? "Hoy / menos de 24 horas" : `${safeDays} día(s)`}
 - Horas disponibles por día: ${safeHoursPerDay} h
@@ -885,17 +1064,16 @@ BASE DE CONTENIDOS DE LA MATERIA:
 Resumen general: ${executiveSummary}
 Conceptos clave:
 ${contextConcepts || "(Elaborar sobre los conceptos centrales universitarios de la materia)"}
-Fórmulas / Relaciones:
-${contextFormulas || "(Incluir las fórmulas o modelos centrales de la materia en LaTeX puro)"}
+${!isTheoreticalNoMath ? `Fórmulas / Relaciones:\n${contextFormulas}` : ""}
 Trampas de examen:
 ${contextTraps || "(Incluir errores frecuentes en exámenes universitarios de esta materia)"}
 
 INSTRUCCIONES DE FORMATO PARA LECTURA AMIGABLE:
 - En \`compressedSummary\`, escribí solo una breve introducción de 1 a 2 oraciones.
-- En \`summarySections\`, organizá el resumen completo en 3 a 4 secciones ordenadas (ej: 1. Conexión entre unidades, 2. Leyes y conceptos fundamentales, 3. Criterios prácticos de examen). Cada sección debe tener título claro, explicación amigable debajo y, cuando aparezca una fórmula o ecuación clave, colocala en \`formulaLatex\` (LaTeX puro sin signos \`$\`) para que se destaque aparte en negrita y en su propio párrafo.
+- En \`summarySections\`, organizá el resumen completo en 3 a 4 secciones ordenadas (ej: 1. Conexión entre unidades, 2. Ejes o estructuras fundamentales, 3. Criterios prácticos de examen). Cada sección debe tener título claro y explicación amigable debajo. ${isTheoreticalNoMath ? "NO inventes fórmulas en `formulaLatex` (dejalo vacío)." : "Cuando aparezca una fórmula clave, colocala en `formulaLatex` (LaTeX puro sin `$`)."}
 - ${includeTimeDistribution ? "En `timeAllocationAdvice`, recomendá concretamente cómo repartir las " + totalEffectiveHours + " horas útiles disponibles." : "Dejá `timeAllocationAdvice` como cadena vacía \"\" porque el usuario no solicitó distribución de tiempo."}
 - En \`priorityTopics\`, ordená 3 a 5 temas de mayor a menor rentabilidad para el examen.
-- En \`mustMemorizeFormulas\`, devolvé 3 a 5 fórmulas o relaciones en LaTeX puro (sin \`$\` alrededor) con un consejo práctico de aplicación rápida.
+- En \`mustMemorizeFormulas\`: ${isTheoreticalNoMath ? "Devolvé arreglo vacío `[]` porque esta asignatura no requiere cálculos ni fórmulas." : "Devolvé 3 a 5 fórmulas en LaTeX puro (sin `$` alrededor) con un consejo práctico de aplicación rápida."}
 - En \`discardForNow\`, indicá 2 a 3 cosas que conviene dejar para el final (o descartar si faltan horas) para maximizar la nota con el tiempo real disponible.
 - En \`lastHourChecklist\`, incluí 4 a 5 verificaciones rápidas previas a entrar al aula.
 `;
@@ -1128,6 +1306,7 @@ REQUISITOS:
             .join("\n")
         : "";
 
+      const hasFormulas = Array.isArray(formulas) && formulas.length > 0;
       const isImproveMode = mode === "improve";
       const targetNote =
         targetSectionOrder !== null && targetSectionOrder !== undefined
@@ -1154,10 +1333,16 @@ MENSAJE DEL ESTUDIANTE:
 "${message.trim()}"
 
 INSTRUCCIONES:
-1. En \`reply\`: Respondé siempre con calidez, claridad y tono amigable (como un buen docente particular o ayudante de cátedra). Usá ejemplos sencillos de la vida cotidiana cuando ayuden a visualizar la idea. Si escribís una ecuación importante en el texto, ponela en párrafo aparte entre \`$$...$$\` para que se lea cómoda.
+1. En \`reply\`: Respondé siempre con calidez, claridad y tono amigable (como un buen docente particular o ayudante de cátedra). Usá ejemplos sencillos de la vida cotidiana o visuales/anatómicos cuando ayuden a visualizar la idea. ${
+        hasFormulas
+          ? "Si escribís una ecuación importante en el texto, ponela en párrafo aparte entre `$$...$$` para que se lea cómoda."
+          : "Esta materia es teórica/visual y NO requiere cuentas ni fórmulas matemáticas: explicá mediante relaciones conceptuales, ubicación espacial, partes, estructuras y ejemplos gráficos o clínicos sin inventar ecuaciones ni cálculos."
+      }
 2. ${
         isImproveMode
-          ? "En `suggestedSections`: Generá las secciones corregidas con mejor redacción, oraciones más cortas, transiciones claras y sin perder precisión universitaria. Conservá `order` exacto de cada sección modificada. Si había una fórmula útil en `formulaLatex`, mantenela o aclarala en `formulaCaption`."
+          ? hasFormulas
+            ? "En `suggestedSections`: Generá las secciones corregidas con mejor redacción, oraciones más cortas, transiciones claras y sin perder precisión universitaria. Conservá `order` exacto de cada sección modificada. Si había una fórmula útil en `formulaLatex`, mantenela o aclarala en `formulaCaption`."
+            : "En `suggestedSections`: Generá las secciones corregidas con mejor redacción, oraciones más cortas, transiciones claras y descripciones visuales/anatómicas precisas. Conservá `order` exacto de cada sección modificada y dejá `formulaLatex` vacío porque la materia no requiere fórmulas."
           : "Si el estudiante solo está haciendo una pregunta conceptual o de ejercicio, dejá `suggestedSections` como arreglo vacío `[]`. Solo completá `suggestedSections` si el usuario pide explícitamente corregir o reescribir una sección del resumen."
       }
 `;

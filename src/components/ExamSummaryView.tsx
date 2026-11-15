@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
+  ArrowUp,
   BookOpen,
   BookOpenText,
   Calculator,
@@ -9,11 +10,15 @@ import {
   FileDown,
   Loader2,
   Moon,
+  Eye,
 } from 'lucide-react';
 import { StudyPlan, StudyTab } from '../types/study';
 import { MathBlock, MathText } from './MathText';
 import { SummaryPdfSheet } from './SummaryPdfSheet';
+import { VisualDiagramCard } from './VisualDiagramCard';
 import { exportBlocksToPdf } from '../utils/exportPdf';
+
+type SummarySectionTarget = 'all' | 'concepts' | 'visuals' | 'formulas' | 'traps';
 
 interface ExamSummaryViewProps {
   plan: StudyPlan;
@@ -34,12 +39,48 @@ export function ExamSummaryView({
   onToggleNightMode,
   onAskAssistant,
 }: ExamSummaryViewProps) {
-  const [filterMode, setFilterMode] = useState<'all' | 'concepts' | 'formulas' | 'traps'>('all');
+  const [activeSection, setActiveSection] = useState<SummarySectionTarget>('all');
+  const [highlightedSection, setHighlightedSection] = useState<SummarySectionTarget | null>(null);
   const [localReadingMode, setLocalReadingMode] = useState(false);
   const [localNightMode, setLocalNightMode] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const pdfSheetRef = useRef<HTMLDivElement | null>(null);
+
+  const summaryTopRef = useRef<HTMLElement | null>(null);
+  const conceptsRef = useRef<HTMLElement | null>(null);
+  const visualsRef = useRef<HTMLElement | null>(null);
+  const formulasRef = useRef<HTMLElement | null>(null);
+  const trapsRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setActiveSection('all');
+    setHighlightedSection(null);
+  }, [plan.id]);
+
+  useEffect(() => {
+    if (!highlightedSection) return;
+    const timer = window.setTimeout(() => setHighlightedSection(null), 1400);
+    return () => window.clearTimeout(timer);
+  }, [highlightedSection]);
+
+  const handleJumpToSection = (target: SummarySectionTarget) => {
+    setActiveSection(target);
+    const refMap: Record<SummarySectionTarget, RefObject<HTMLElement | null>> = {
+      all: summaryTopRef,
+      concepts: conceptsRef,
+      visuals: visualsRef,
+      formulas: formulasRef,
+      traps: trapsRef,
+    };
+    const element = refMap[target].current;
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (target !== 'all') {
+        setHighlightedSection(target);
+      }
+    }
+  };
 
   const isReadingMode =
     controlledReadingMode !== undefined ? controlledReadingMode : localReadingMode;
@@ -97,6 +138,11 @@ export function ExamSummaryView({
   };
 
   const sections = plan.summarySections ?? [];
+  const visualExamples = plan.visualExamples ?? [];
+  const hasConcepts = plan.keyConcepts.length > 0;
+  const hasFormulas = plan.formulas.length > 0;
+  const hasVisuals = visualExamples.length > 0;
+  const hasTraps = plan.examTraps.length > 0;
 
   const cardSurface = isNightMode
     ? 'bg-[#171E2B] border-[#293549]'
@@ -145,7 +191,10 @@ export function ExamSummaryView({
       }`}
     >
       {/* Ordered Executive Summary */}
-      <section className={`border rounded-xl p-6 space-y-6 transition-colors duration-200 ${cardSurface}`}>
+      <section
+        ref={summaryTopRef}
+        className={`scroll-mt-28 border rounded-xl p-6 space-y-6 transition-colors duration-200 ${cardSurface}`}
+      >
         <div
           className={`flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-4 border-b ${dividerColor}`}
         >
@@ -286,9 +335,10 @@ export function ExamSummaryView({
               </span>
             </button>
 
-            {/* Interactive section filter */}
-            <div
-              className={`inline-flex items-center gap-1 p-1 rounded-lg font-sans ${
+            {/* Quick section jump navigation */}
+            <nav
+              aria-label="Ir directo a apartado del resumen"
+              className={`inline-flex flex-wrap items-center gap-1 p-1 rounded-lg font-sans ${
                 isNightMode
                   ? 'bg-[#111722]'
                   : isReadingMode
@@ -298,34 +348,37 @@ export function ExamSummaryView({
             >
               {(
                 [
-                  { id: 'all', label: 'Todo' },
-                  { id: 'concepts', label: 'Conceptos' },
-                  { id: 'formulas', label: 'Fórmulas' },
-                  { id: 'traps', label: 'Trampas' },
+                  { id: 'all', label: 'Todo', show: true },
+                  { id: 'concepts', label: 'Conceptos', show: hasConcepts },
+                  { id: 'visuals', label: 'Esquemas visuales', show: hasVisuals },
+                  { id: 'formulas', label: 'Fórmulas', show: hasFormulas },
+                  { id: 'traps', label: 'Trampas', show: hasTraps },
                 ] as const
-              ).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setFilterMode(item.id)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
-                    filterMode === item.id
-                      ? isNightMode
-                        ? 'bg-[#253147] text-[#F1F5F9] shadow-xs'
-                        : isReadingMode
-                          ? 'bg-[#FAF6EB] text-[#241E18] shadow-xs'
-                          : 'bg-white text-slate-900 shadow-xs'
-                      : isNightMode
-                        ? 'text-[#94A3B8] hover:text-[#F1F5F9]'
-                        : isReadingMode
-                          ? 'text-[#6E6254] hover:text-[#241E18]'
-                          : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+              )
+                .filter((item) => item.show)
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleJumpToSection(item.id)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 ${
+                      activeSection === item.id
+                        ? isNightMode
+                          ? 'bg-[#253147] text-[#F1F5F9] shadow-xs'
+                          : isReadingMode
+                            ? 'bg-[#FAF6EB] text-[#241E18] shadow-xs'
+                            : 'bg-white text-slate-900 shadow-xs'
+                        : isNightMode
+                          ? 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                          : isReadingMode
+                            ? 'text-[#6E6254] hover:text-[#241E18]'
+                            : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+            </nav>
           </div>
         </div>
 
@@ -403,18 +456,40 @@ export function ExamSummaryView({
       </section>
 
       {/* Key Concepts */}
-      {(filterMode === 'all' || filterMode === 'concepts') && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
+      {hasConcepts && (
+        <section
+          ref={conceptsRef}
+          id="resumen-conceptos"
+          className={`scroll-mt-28 space-y-4 rounded-xl transition-shadow duration-300 ${
+            highlightedSection === 'concepts'
+              ? isNightMode
+                ? 'ring-2 ring-[#3B82F6]/60 ring-offset-4 ring-offset-[#111722]'
+                : isReadingMode
+                  ? 'ring-2 ring-[#8B5220]/45 ring-offset-4 ring-offset-[#F6F0E2]'
+                  : 'ring-2 ring-blue-500/45 ring-offset-4 ring-offset-slate-50'
+              : ''
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <BookOpen className={`w-4 h-4 ${accentInk}`} />
               <h3 className={`text-lg font-semibold ${headingInk}`}>
                 Conceptos clave y ejemplos sencillos
               </h3>
             </div>
-            <span className={`text-xs tabular-nums ${mutedInk}`}>
-              {plan.keyConcepts.length} núcleos temáticos
-            </span>
+            <div className="flex items-center gap-3">
+              <span className={`text-xs tabular-nums ${mutedInk}`}>
+                {plan.keyConcepts.length} núcleos temáticos
+              </span>
+              <button
+                type="button"
+                onClick={() => handleJumpToSection('all')}
+                className={`inline-flex items-center gap-1 text-xs font-medium font-sans transition-colors ${mutedInk} hover:underline`}
+              >
+                <ArrowUp className="w-3 h-3" />
+                Arriba
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -475,19 +550,92 @@ export function ExamSummaryView({
         </section>
       )}
 
+      {/* Visual & Anatomical Examples */}
+      {hasVisuals && (
+        <section
+          ref={visualsRef}
+          id="resumen-esquemas"
+          className={`scroll-mt-28 space-y-4 rounded-xl transition-shadow duration-300 ${
+            highlightedSection === 'visuals'
+              ? isNightMode
+                ? 'ring-2 ring-[#3B82F6]/60 ring-offset-4 ring-offset-[#111722]'
+                : isReadingMode
+                  ? 'ring-2 ring-[#8B5220]/45 ring-offset-4 ring-offset-[#F6F0E2]'
+                  : 'ring-2 ring-blue-500/45 ring-offset-4 ring-offset-slate-50'
+              : ''
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Eye className={`w-4 h-4 ${accentInk}`} />
+              <h3 className={`text-lg font-semibold ${headingInk}`}>
+                Ejemplos gráficos y partes clave
+              </h3>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`text-xs tabular-nums ${mutedInk}`}>
+                {visualExamples.length}{' '}
+                {visualExamples.length === 1 ? 'esquema interactivo' : 'esquemas interactivos'}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleJumpToSection('all')}
+                className={`inline-flex items-center gap-1 text-xs font-medium font-sans transition-colors ${mutedInk} hover:underline`}
+              >
+                <ArrowUp className="w-3 h-3" />
+                Arriba
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {visualExamples.map((example) => (
+              <VisualDiagramCard
+                key={example.id}
+                example={example}
+                isReadingMode={isReadingMode}
+                isNightMode={isNightMode}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Critical Formulas */}
-      {(filterMode === 'all' || filterMode === 'formulas') && plan.formulas.length > 0 && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
+      {hasFormulas && (
+        <section
+          ref={formulasRef}
+          id="resumen-formulas"
+          className={`scroll-mt-28 space-y-4 rounded-xl transition-shadow duration-300 ${
+            highlightedSection === 'formulas'
+              ? isNightMode
+                ? 'ring-2 ring-[#3B82F6]/60 ring-offset-4 ring-offset-[#111722]'
+                : isReadingMode
+                  ? 'ring-2 ring-[#8B5220]/45 ring-offset-4 ring-offset-[#F6F0E2]'
+                  : 'ring-2 ring-blue-500/45 ring-offset-4 ring-offset-slate-50'
+              : ''
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Calculator className={`w-4 h-4 ${accentInk}`} />
               <h3 className={`text-lg font-semibold ${headingInk}`}>
                 Formulario y relaciones críticas
               </h3>
             </div>
-            <span className={`text-xs tabular-nums ${mutedInk}`}>
-              {plan.formulas.length} ecuaciones
-            </span>
+            <div className="flex items-center gap-3">
+              <span className={`text-xs tabular-nums ${mutedInk}`}>
+                {plan.formulas.length} ecuaciones
+              </span>
+              <button
+                type="button"
+                onClick={() => handleJumpToSection('all')}
+                className={`inline-flex items-center gap-1 text-xs font-medium font-sans transition-colors ${mutedInk} hover:underline`}
+              >
+                <ArrowUp className="w-3 h-3" />
+                Arriba
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -576,10 +724,22 @@ export function ExamSummaryView({
       )}
 
       {/* Exam Traps */}
-      {(filterMode === 'all' || filterMode === 'traps') && plan.examTraps.length > 0 && (
-        <section className={`border rounded-xl overflow-hidden transition-colors duration-200 ${cardSurface}`}>
+      {hasTraps && (
+        <section
+          ref={trapsRef}
+          id="resumen-trampas"
+          className={`scroll-mt-28 border rounded-xl overflow-hidden transition-all duration-300 ${cardSurface} ${
+            highlightedSection === 'traps'
+              ? isNightMode
+                ? 'ring-2 ring-[#3B82F6]/60 ring-offset-4 ring-offset-[#111722]'
+                : isReadingMode
+                  ? 'ring-2 ring-[#8B5220]/45 ring-offset-4 ring-offset-[#F6F0E2]'
+                  : 'ring-2 ring-blue-500/45 ring-offset-4 ring-offset-slate-50'
+              : ''
+          }`}
+        >
           <div
-            className={`px-6 py-4 border-b flex items-center justify-between gap-4 ${
+            className={`px-6 py-4 border-b flex flex-wrap items-center justify-between gap-4 ${
               isNightMode
                 ? 'border-[#293549]'
                 : isReadingMode
@@ -601,20 +761,32 @@ export function ExamSummaryView({
                 Trampas frecuentes en parciales y finales
               </h3>
             </div>
-            <button
-              type="button"
-              onClick={() => onNavigateTab('exercises')}
-              className={`inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap shrink-0 font-sans ${
-                isNightMode
-                  ? 'text-[#7CB4FF] hover:text-[#93C5FD]'
-                  : isReadingMode
-                    ? 'text-[#8B5220] hover:text-[#6B3E16]'
-                    : 'text-blue-700 hover:text-blue-800'
-              }`}
-            >
-              Practicar en ejercicios
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => handleJumpToSection('all')}
+                className={`inline-flex items-center gap-1 text-xs font-medium font-sans transition-colors ${mutedInk} hover:underline`}
+              >
+                <ArrowUp className="w-3 h-3" />
+                Arriba
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('exercises')}
+                className={`inline-flex items-center gap-1.5 text-xs font-medium whitespace-nowrap shrink-0 font-sans ${
+                  isNightMode
+                    ? 'text-[#7CB4FF] hover:text-[#93C5FD]'
+                    : isReadingMode
+                      ? 'text-[#8B5220] hover:text-[#6B3E16]'
+                      : 'text-blue-700 hover:text-blue-800'
+                }`}
+              >
+                {plan.subjectMode === 'theoretical' || !hasFormulas
+                  ? 'Ver casos visuales paso a paso'
+                  : 'Practicar en ejercicios'}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           <div
@@ -695,7 +867,7 @@ export function ExamSummaryView({
         >
           <SummaryPdfSheet
             plan={plan}
-            filterMode={filterMode}
+            filterMode={activeSection === 'visuals' ? 'all' : activeSection}
             readingMode={isReadingMode}
           />
         </div>

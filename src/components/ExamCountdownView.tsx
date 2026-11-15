@@ -10,12 +10,16 @@ import {
   BookOpenText,
   Moon,
 } from 'lucide-react';
-import { AdaptiveExamSummary, ExamUrgencyTier, StudyPlan } from '../types/study';
+import { AdaptiveExamSummary, ExamReminderConfig, ExamUrgencyTier, StudyPlan } from '../types/study';
 import { MathBlock, MathText } from './MathText';
+import { VisualDiagramCard } from './VisualDiagramCard';
+import { ExamReminderSettings } from './ExamReminderSettings';
 
 interface ExamCountdownViewProps {
   plan: StudyPlan;
   onUpdateExamDate: (examDate: string) => void;
+  onUpdateReminderConfig: (config: ExamReminderConfig) => void;
+  onSendTestAlert: () => void;
   onSaveAdaptiveSummary: (summary: AdaptiveExamSummary, examDate: string) => void;
   readingMode?: boolean;
   onToggleReadingMode?: () => void;
@@ -89,6 +93,8 @@ function getTierMeta(daysRemaining: number): {
 export function ExamCountdownView({
   plan,
   onUpdateExamDate,
+  onUpdateReminderConfig,
+  onSendTestAlert,
   onSaveAdaptiveSummary,
   readingMode: controlledReadingMode,
   onToggleReadingMode,
@@ -409,6 +415,16 @@ export function ExamCountdownView({
         )}
       </section>
 
+      <ExamReminderSettings
+        examDate={selectedDate}
+        reminderConfig={plan.reminderConfig}
+        showDateInput={false}
+        onUpdateReminderConfig={onUpdateReminderConfig}
+        onSendTestAlert={onSendTestAlert}
+        isReadingMode={isReadingMode}
+        isNightMode={isNightMode}
+      />
+
       {/* Generated Adaptive Summary */}
       {summary ? (
         <div
@@ -692,10 +708,14 @@ export function ExamCountdownView({
             )}
           </section>
 
-          {/* Priority Topics & Must-Memorize Formulas */}
+          {/* Priority Topics & Must-Memorize Formulas / Visual Reference */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <section
-              className={`lg:col-span-7 border rounded-xl overflow-hidden transition-colors duration-200 ${
+              className={`${
+                summary.mustMemorizeFormulas.length > 0 || (plan.visualExamples?.length ?? 0) > 0
+                  ? 'lg:col-span-7'
+                  : 'lg:col-span-12'
+              } border rounded-xl overflow-hidden transition-colors duration-200 ${
                 isNightMode
                   ? 'bg-[#171E2B] border-[#293549]'
                   : isReadingMode
@@ -798,95 +818,105 @@ export function ExamCountdownView({
               </div>
             </section>
 
-            <section
-              className={`lg:col-span-5 border rounded-xl overflow-hidden transition-colors duration-200 ${
-                isNightMode
-                  ? 'bg-[#171E2B] border-[#293549]'
-                  : isReadingMode
-                    ? 'bg-[#FAF6EB] border-[#E4DCC8]'
-                    : 'bg-white border-slate-200'
-              }`}
-            >
-              <div
-                className={`px-5 py-4 border-b ${
+            {summary.mustMemorizeFormulas.length > 0 ? (
+              <section
+                className={`lg:col-span-5 border rounded-xl overflow-hidden transition-colors duration-200 ${
                   isNightMode
-                    ? 'border-[#253042]'
+                    ? 'bg-[#171E2B] border-[#293549]'
                     : isReadingMode
-                      ? 'border-[#E9E1CE]'
-                      : 'border-slate-200'
+                      ? 'bg-[#FAF6EB] border-[#E4DCC8]'
+                      : 'bg-white border-slate-200'
                 }`}
               >
-                <h3
-                  className={`text-base font-semibold ${
+                <div
+                  className={`px-5 py-4 border-b ${
                     isNightMode
-                      ? 'text-white'
+                      ? 'border-[#253042]'
                       : isReadingMode
-                        ? 'text-[#241E18]'
-                        : 'text-slate-900'
+                        ? 'border-[#E9E1CE]'
+                        : 'border-slate-200'
                   }`}
                 >
-                  Fórmulas clave para memorizar
-                </h3>
-                <p
-                  className={`text-xs ${
+                  <h3
+                    className={`text-base font-semibold ${
+                      isNightMode
+                        ? 'text-white'
+                        : isReadingMode
+                          ? 'text-[#241E18]'
+                          : 'text-slate-900'
+                    }`}
+                  >
+                    Fórmulas clave para memorizar
+                  </h3>
+                  <p
+                    className={`text-xs ${
+                      isNightMode
+                        ? 'text-[#94A3B8]'
+                        : isReadingMode
+                          ? 'text-[#6E6254]'
+                          : 'text-slate-500'
+                    }`}
+                  >
+                    Lo mínimo indispensable que tenés que saber de memoria o deducir rápido.
+                  </p>
+                </div>
+                <div
+                  className={`divide-y ${
                     isNightMode
-                      ? 'text-[#94A3B8]'
+                      ? 'divide-[#253042]'
                       : isReadingMode
-                        ? 'text-[#6E6254]'
-                        : 'text-slate-500'
+                        ? 'divide-[#E9E1CE]'
+                        : 'divide-slate-100'
                   }`}
                 >
-                  Lo mínimo indispensable que tenés que saber de memoria o deducir rápido.
-                </p>
-              </div>
-              <div
-                className={`divide-y ${
-                  isNightMode
-                    ? 'divide-[#253042]'
-                    : isReadingMode
-                      ? 'divide-[#E9E1CE]'
-                      : 'divide-slate-100'
-                }`}
-              >
-                {summary.mustMemorizeFormulas.map((f, idx) => (
-                  <div key={idx} className="p-5 space-y-2.5">
-                    <h4
-                      className={`text-sm font-semibold ${
-                        isNightMode
-                          ? 'text-white'
-                          : isReadingMode
-                            ? 'text-[#241E18]'
-                            : 'text-slate-900'
-                      }`}
-                    >
-                      {f.name}
-                    </h4>
-                    <div
-                      className={`border rounded-lg px-3 py-2.5 overflow-x-auto text-center ${
-                        isNightMode
-                          ? 'bg-[#1F2838] border-[#313F57] text-white'
-                          : isReadingMode
-                            ? 'bg-[#F2ECDC] border-[#DFD6BF] text-[#241E18]'
-                            : 'bg-slate-50 border-slate-200 text-slate-950'
-                      }`}
-                    >
-                      <MathBlock latex={f.latex} displayMode={true} bold={true} />
+                  {summary.mustMemorizeFormulas.map((f, idx) => (
+                    <div key={idx} className="p-5 space-y-2.5">
+                      <h4
+                        className={`text-sm font-semibold ${
+                          isNightMode
+                            ? 'text-white'
+                            : isReadingMode
+                              ? 'text-[#241E18]'
+                              : 'text-slate-900'
+                        }`}
+                      >
+                        {f.name}
+                      </h4>
+                      <div
+                        className={`border rounded-lg px-3 py-2.5 overflow-x-auto text-center ${
+                          isNightMode
+                            ? 'bg-[#1F2838] border-[#313F57] text-white'
+                            : isReadingMode
+                              ? 'bg-[#F2ECDC] border-[#DFD6BF] text-[#241E18]'
+                              : 'bg-slate-50 border-slate-200 text-slate-950'
+                        }`}
+                      >
+                        <MathBlock latex={f.latex} displayMode={true} bold={true} />
+                      </div>
+                      <p
+                        className={`text-xs leading-relaxed ${
+                          isNightMode
+                            ? 'text-[#CBD5E1]'
+                            : isReadingMode
+                              ? 'text-[#4A4035]'
+                              : 'text-slate-600'
+                        }`}
+                      >
+                        <MathText text={f.survivalTip} />
+                      </p>
                     </div>
-                    <p
-                      className={`text-xs leading-relaxed ${
-                        isNightMode
-                          ? 'text-[#CBD5E1]'
-                          : isReadingMode
-                            ? 'text-[#4A4035]'
-                            : 'text-slate-600'
-                      }`}
-                    >
-                      <MathText text={f.survivalTip} />
-                    </p>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </section>
+            ) : plan.visualExamples && plan.visualExamples[0] ? (
+              <div className="lg:col-span-5">
+                <VisualDiagramCard
+                  example={plan.visualExamples[0]}
+                  isReadingMode={isReadingMode}
+                  isNightMode={isNightMode}
+                />
               </div>
-            </section>
+            ) : null}
           </div>
 
           {/* What to discard vs Last Hour Checklist */}

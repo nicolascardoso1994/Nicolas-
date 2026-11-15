@@ -812,3 +812,597 @@ export const SAMPLE_MATH_PLAN: StudyPlan = {
     },
   ],
 };
+
+export const SAMPLE_ANATOMY_PLAN: StudyPlan = {
+  id: 'plan-anatomia-demo',
+  subject: 'Anatomía Humana — Corazón y Sistema Nervioso',
+  subjectMode: 'theoretical',
+  examType: 'Primer Parcial',
+  examDate: '2026-11-19',
+  folder: 'Anatomía',
+  pinned: false,
+  createdAt: '2026-11-15T08:00:00.000Z',
+  totalMinutes: 240,
+  daysAvailable: 2,
+  hoursPerDay: 2,
+  pace: 'Equilibrado',
+  executiveSummary:
+    'Síntesis anatómica centrada en reconocer las cavidades cardíacas, grandes vasos, recorrido de la circulación y las partes funcionales de la neurona.',
+  summarySections: [
+    {
+      order: 1,
+      title: 'Conexión entre anatomía macroscópica y función',
+      content:
+        'En anatomía descriptiva no memorices nombres aislados: cada estructura explica su función por su forma y ubicación. Las paredes gruesas del ventrículo izquierdo responden a la presión necesaria para impulsar sangre a todo el cuerpo, mientras que la vaina de mielina en la neurona acelera la conducción saltatoria del impulso.',
+    },
+    {
+      order: 2,
+      title: 'Corazón derecho vs. corazón izquierdo',
+      content:
+        'El lado derecho del corazón maneja sangre carboxigenada proveniente de las venas cavas y la envía hacia los pulmones por el tronco pulmonar. El lado izquierdo recibe sangre oxigenada desde las venas pulmonares y la eyecta hacia la aorta para irrigar la circulación sistémica.',
+    },
+    {
+      order: 3,
+      title: 'Organización estructural de la neurona',
+      content:
+        'La neurona presenta polaridad funcional: las dendritas y el soma integran señales entrantes, el axón conduce el potencial de acción en dirección anterógrada y los botones terminales liberan neurotransmisores en la hendidura sináptica.',
+    },
+  ],
+  visualExamples: [
+    {
+      id: 'vis-anat-heart',
+      title: 'Anatomía del Corazón y Grandes Vasos',
+      categoryLabel: 'Ejemplo anatómico · Vista anterior',
+      caption: 'Hacé clic en cada número para ubicar cavidades, válvulas y grandes vasos.',
+      templateId: 'heart',
+      parts: [
+        {
+          id: 'heart-1',
+          number: 1,
+          label: 'Aurícula derecha',
+          location: 'Región superior derecha del corazón',
+          description:
+            'Recibe sangre venosa desoxigenada de todo el cuerpo a través de la vena cava superior e inferior y del seno coronario.',
+          examTip:
+            'En su pared superior se aloja el nodo sinoauricular (marcapasos fisiológico del corazón).',
+          x: 138,
+          y: 118,
+        },
+        {
+          id: 'heart-2',
+          number: 2,
+          label: 'Ventrículo derecho',
+          location: 'Región anteroinferior derecha',
+          description:
+            'Recibe sangre desde la aurícula derecha a través de la válvula tricúspide y la impulsa hacia los pulmones por el tronco pulmonar.',
+          examTip:
+            'Tiene pared muscular más delgada que el ventrículo izquierdo porque la resistencia pulmonar es menor.',
+          x: 164,
+          y: 184,
+        },
+        {
+          id: 'heart-3',
+          number: 3,
+          label: 'Cayado de la aorta',
+          location: 'Base superior, emerge del ventrículo izquierdo',
+          description:
+            'Arteria elástica principal que distribuye sangre oxigenada hacia la circulación sistémica mediante tres troncos supraaórticos.',
+          examTip:
+            'Sus tres ramas principales en orden son: tronco braquiocefálico, carótida común izquierda y subclavia izquierda.',
+          x: 196,
+          y: 52,
+        },
+        {
+          id: 'heart-4',
+          number: 4,
+          label: 'Aurícula izquierda',
+          location: 'Región posterosuperior izquierda',
+          description:
+            'Recibe sangre oxigenada desde los pulmones por medio de las cuatro venas pulmonares y la pasa al ventrículo izquierdo por la válvula mitral.',
+          examTip:
+            'Es la cavidad más posterior del corazón; su dilatación puede comprimir el esófago.',
+          x: 248,
+          y: 112,
+        },
+        {
+          id: 'heart-5',
+          number: 5,
+          label: 'Ventrículo izquierdo',
+          location: 'Vértice (ápex) y cara izquierda',
+          description:
+            'Cavidad de pared miocárdica más gruesa encargada de eyectar la sangre oxigenada hacia la aorta venciendo la presión sistémica.',
+          examTip:
+            'Forma el choque de punta cardíaco palpable en el 5.° espacio intercostal izquierdo, línea medioclavicular.',
+          x: 234,
+          y: 184,
+        },
+      ],
+    },
+    {
+      id: 'vis-anat-neuron',
+      title: 'Partes Anatómicas de la Neurona Multipolar',
+      categoryLabel: 'Ejemplo neuroanatómico',
+      caption: 'Explorá cada región desde la recepción de estímulos hasta la sinapsis.',
+      templateId: 'neuron',
+      parts: [
+        {
+          id: 'neuron-1',
+          number: 1,
+          label: 'Dendritas',
+          location: 'Prolongaciones ramificadas del soma',
+          description:
+            'Constituyen la principal superficie receptora donde llegan sinapsis excitatorias e inhibitorias desde otras neuronas.',
+          examTip:
+            'Presentan espinas dendríticas clave en la plasticidad sináptica y el aprendizaje.',
+          x: 62,
+          y: 112,
+        },
+        {
+          id: 'neuron-2',
+          number: 2,
+          label: 'Soma (cuerpo celular)',
+          location: 'Centro metabólico neuronal',
+          description:
+            'Contiene el núcleo y los corpúsculos de Nissl (retículo endoplasmático rugoso) donde se sintetizan proteínas y enzimas.',
+          examTip:
+            'En el sistema nervioso central los somas se agrupan formando núcleos; en el periférico forman ganglios.',
+          x: 114,
+          y: 132,
+        },
+        {
+          id: 'neuron-3',
+          number: 3,
+          label: 'Vaina de mielina',
+          location: 'Envoltura aislante alrededor del axón',
+          description:
+            'Capas lipídicas que aíslan eléctricamente el axón para permitir conducción rápida entre nódulos.',
+          examTip:
+            'En el SNC la mielina la producen los oligodendrocitos; en el SNP la producen las células de Schwann.',
+          x: 183,
+          y: 132,
+        },
+        {
+          id: 'neuron-4',
+          number: 4,
+          label: 'Nódulo de Ranvier',
+          location: 'Espacios sin mielina entre segmentos',
+          description:
+            'Zonas ricas en canales de sodio dependientes de voltaje donde se regenera el potencial de acción (conducción saltatoria).',
+          examTip:
+            'Evitan la atenuación de la señal a lo largo de axones largos sin gastar energía excesiva.',
+          x: 255,
+          y: 132,
+        },
+        {
+          id: 'neuron-5',
+          number: 5,
+          label: 'Botones terminales (telodendrón)',
+          location: 'Extremo distal del axón',
+          description:
+            'Almacenan vesículas con neurotransmisores que se liberan por exocitosis cuando ingresa calcio tras la despolarización.',
+          examTip:
+            'Conforman el elemento presináptico de la sinapsis química.',
+          x: 356,
+          y: 132,
+        },
+      ],
+    },
+  ],
+  studyBlocks: [
+    {
+      id: 'blk-anat-1',
+      sessionLabel: 'Día 1 · Bloque 1',
+      title: 'Cavidades cardíacas, válvulas y grandes vasos',
+      category: 'teoria',
+      durationMinutes: 60,
+      objective: 'Ubicar las 4 cavidades y el sentido unidireccional del flujo sanguíneo en el esquema del corazón.',
+      deliverable: 'Recorrido completo de circulación menor y mayor explicado de memoria.',
+      targetTab: 'summary',
+      completed: false,
+    },
+    {
+      id: 'blk-anat-2',
+      sessionLabel: 'Día 1 · Bloque 2',
+      title: 'Recorrido anatómico paso a paso sobre esquemas',
+      category: 'practica',
+      durationMinutes: 60,
+      objective: 'Identificar cada estructura en los casos visuales de Corazón y Neurona.',
+      deliverable: 'Acertar todas las comprobaciones visuales sin mirar apuntes.',
+      targetTab: 'exercises',
+      completed: false,
+    },
+    {
+      id: 'blk-anat-3',
+      sessionLabel: 'Día 2 · Bloque 1',
+      title: 'Estructura neuronal y glía mielinizante',
+      category: 'repaso',
+      durationMinutes: 60,
+      objective: 'Diferenciar dendritas, soma, mielina (SNC vs SNP) y botón terminal.',
+      deliverable: 'Lista de verificación completa sin errores.',
+      targetTab: 'guide',
+      completed: false,
+    },
+    {
+      id: 'blk-anat-4',
+      sessionLabel: 'Día 2 · Bloque 2',
+      title: 'Autoevaluación de reconocimiento anatómico',
+      category: 'simulacro',
+      durationMinutes: 60,
+      objective: 'Responder preguntas tipo parcial diferenciando cavidades y regiones.',
+      deliverable: 'Diagnóstico listo antes de rendir.',
+      targetTab: 'guide',
+      completed: false,
+    },
+  ],
+  keyConcepts: [
+    {
+      id: 'con-anat-1',
+      term: 'Circulación menor (pulmonar) vs. mayor (sistémica)',
+      academicDefinition:
+        'La circulación menor transporta sangre venosa desde el ventrículo derecho hacia los pulmones para hematosis y retorna a la aurícula izquierda; la mayor parte del ventrículo izquierdo hacia los tejidos y vuelve a la aurícula derecha.',
+      simpleExplanation:
+        'El circuito menor oxigena la sangre en los pulmones; el circuito mayor reparte esa sangre ya oxigenada a todo el cuerpo.',
+      everydayExample:
+        'Es como un camión que primero pasa por la planta de carga (pulmones) y después sale a repartir por toda la ciudad (cuerpo).',
+    },
+    {
+      id: 'con-anat-2',
+      term: 'Válvulas auriculoventriculares y sigmoideas',
+      academicDefinition:
+        'Las válvulas tricúspide (derecha) y mitral o bicúspide (izquierda) impiden el reflujo hacia las aurículas durante la sístole; las semilunares pulmonar y aórtica impiden el retorno desde las arterias en diástole.',
+      simpleExplanation:
+        'Funcionan como puertas de una sola dirección para que la sangre nunca retroceda.',
+      everydayExample:
+        'Parecido a un molinete de subte o una válvula de bicicleta: dejan pasar hacia adelante y se cierran si algo empuja hacia atrás.',
+    },
+    {
+      id: 'con-anat-3',
+      term: 'Conducción saltatoria y mielina',
+      academicDefinition:
+        'El recubrimiento mielínico segmentado aísla la membrana axonal y restringe la despolarización a los nódulos de Ranvier, multiplicando la velocidad de propagación.',
+      simpleExplanation:
+        'En lugar de avanzar paso a paso por toda la membrana, la señal eléctrica “salta” de un espacio libre al siguiente.',
+      everydayExample:
+        'Como cruzar un charco saltando solo por las piedras secas en vez de caminar paso a paso por el agua.',
+    },
+    {
+      id: 'con-anat-4',
+      term: 'Diferencia anatómica: arteria vs. vena',
+      academicDefinition:
+        'Las arterias son vasos eferentes que salen de los ventrículos con pared muscular gruesa; las venas son vasos aferentes que llegan a las aurículas con paredes más delgadas y válvulas venosas.',
+      simpleExplanation:
+        'Arteria significa que SALE del corazón y vena significa que ENTRA al corazón, sin importar si lleva sangre con mucho o poco oxígeno.',
+      everydayExample:
+        'La arteria pulmonar lleva sangre con poco oxígeno pero sigue siendo arteria porque sale del ventrículo derecho.',
+    },
+  ],
+  formulas: [],
+  examTraps: [
+    {
+      id: 'trp-anat-1',
+      mistake: 'Confundir qué lleva la arteria pulmonar y las venas pulmonares',
+      whyItHappens: 'Se suele asociar automáticamente “arteria = sangre oxigenada” y “vena = desoxigenada”.',
+      howToAvoid:
+        'Recordá la regla anatómica: ARTERIA sale del corazón; VENA entra al corazón. Por eso la arteria pulmonar lleva sangre desoxigenada al pulmón y las venas pulmonares traen sangre oxigenada.',
+    },
+    {
+      id: 'trp-anat-2',
+      mistake: 'Invertir derecha e izquierda en un esquema anatómico frontal',
+      whyItHappens: 'Mirar el dibujo desde tu propia derecha en vez de la posición anatómica del paciente.',
+      howToAvoid:
+        'En posición anatómica estándar, el lado derecho del corazón aparece a la izquierda de la pantalla.',
+    },
+    {
+      id: 'trp-anat-3',
+      mistake: 'Confundir oligodendrocitos con células de Schwann',
+      whyItHappens: 'Ambos fabrican mielina, pero pertenecen a divisiones anatómicas distintas.',
+      howToAvoid:
+        'Oligodendrocito = Sistema Nervioso Central (SNC, mieliniza varios axones). Célula de Schwann = Sistema Nervioso Periférico (SNP, un segmento por célula).',
+    },
+  ],
+  guideSections: [
+    {
+      id: 'gui-anat-1',
+      order: 1,
+      title: '1. Seguir el recorrido de una gota de sangre paso a paso',
+      coreIdea: 'Si dominás el orden de las cavidades y válvulas, no fallás ninguna pregunta cardiovascular.',
+      explanation:
+        'Venas cavas → Aurícula derecha → Válvula tricúspide → Ventrículo derecho → Válvula pulmonar → Pulmones → Venas pulmonares → Aurícula izquierda → Válvula mitral → Ventrículo izquierdo → Válvula aórtica → Aorta.',
+      concreteExample:
+        'Si en el parcial te preguntan qué válvula separa la aurícula izquierda del ventrículo izquierdo, ubicás el lado izquierdo en el esquema: válvula mitral (bicúspide).',
+      keyTakeaway: 'Derecha = tricúspide; izquierda = mitral (bicúspide).',
+    },
+    {
+      id: 'gui-anat-2',
+      order: 2,
+      title: '2. Polaridad y dirección de la señal en la neurona',
+      coreIdea: 'La información fluye de dendritas y soma hacia el axón y los botones terminales.',
+      explanation:
+        'Las dendritas reciben múltiples estímulos, el cono axónico decide si se dispara el potencial de acción y el axón mielinizado lo conduce rápido hasta la sinapsis distal.',
+      concreteExample:
+        'En una motoneurona medular, las dendritas reciben órdenes corticales y el axón recorre todo el nervio periférico hasta el músculo.',
+      keyTakeaway: 'Recepción (dendritas) → Integración (soma) → Conducción (axón) → Transmisión (terminal).',
+    },
+  ],
+  masteryChecklist: [
+    { id: 'chk-anat-1', label: 'Identifico en un esquema anterior las 4 cavidades cardíacas sin invertir derecha e izquierda.', checked: false },
+    { id: 'chk-anat-2', label: 'Nombro en orden las válvulas y grandes vasos de la circulación menor y mayor.', checked: false },
+    { id: 'chk-anat-3', label: 'Distingo qué célula mieliniza en el SNC (oligodendrocito) y en el SNP (Schwann).', checked: false },
+    { id: 'chk-anat-4', label: 'Ubico dendritas, soma, nódulos de Ranvier y botones terminales en una neurona.', checked: false },
+  ],
+  quizQuestions: [
+    {
+      id: 'qz-anat-1',
+      question: '¿Qué vaso sanguíneo desemboca en la aurícula izquierda trayendo sangre oxigenada desde los pulmones?',
+      options: [
+        'Vena cava superior',
+        'Tronco pulmonar',
+        'Venas pulmonares',
+        'Arteria aorta',
+      ],
+      correctIndex: 2,
+      explanation: 'Las cuatro venas pulmonares traen sangre oxigenada desde ambos pulmones hacia la aurícula izquierda.',
+    },
+    {
+      id: 'qz-anat-2',
+      question: '¿Qué célula produce la vaina de mielina en los nervios del sistema nervioso periférico (SNP)?',
+      options: [
+        'Astrocito fibroso',
+        'Célula de Schwann',
+        'Microglía',
+        'Oligodendrocito',
+      ],
+      correctIndex: 1,
+      explanation: 'Las células de Schwann forman la mielina en el SNP; los oligodendrocitos lo hacen en el SNC.',
+    },
+  ],
+  exercises: [
+    {
+      id: 'ex-anat-heart-walk',
+      title: 'Recorrido anatómico de la sangre en el corazón',
+      topic: 'Anatomía Cardiovascular',
+      difficulty: 'Base',
+      statement:
+        'Identificá en orden las partes anatómicas del corazón que atraviesa la sangre desde su llegada sistémica hasta su eyección por la aorta.',
+      givenData: [
+        { symbol: 'Llegada', value: 'Venas cavas', unit: 'Sangre venosa' },
+        { symbol: 'Lado derecho', value: 'AD → VD', unit: 'Válvula tricúspide' },
+        { symbol: 'Lado izquierdo', value: 'AI → VI', unit: 'Válvula mitral' },
+      ],
+      unknowns: [
+        'Ubicar cavidades derecha e izquierda en vista anterior',
+        'Diferenciar la pared del ventrículo izquierdo frente al derecho',
+      ],
+      visualConfig: {
+        type: 'visual_diagram',
+        caption: 'Hacé clic en los pines o avanzá por los pasos para resaltar cada parte anatómica.',
+        visualExample: {
+          id: 'ex-vis-heart',
+          title: 'Esquema cardíaco por etapas',
+          categoryLabel: 'Ejemplo anatómico · Recorrido paso a paso',
+          caption: 'Vista anterior anatómica del corazón y grandes vasos',
+          templateId: 'heart',
+          parts: [
+            {
+              id: 'eh-1',
+              number: 1,
+              label: 'Aurícula derecha',
+              location: 'Superior derecha (izquierda en la imagen)',
+              description: 'Recibe la sangre carboxigenada de las venas cavas superior e inferior.',
+              examTip: 'Alberga al nodo sinusal.',
+              x: 138,
+              y: 118,
+            },
+            {
+              id: 'eh-2',
+              number: 2,
+              label: 'Ventrículo derecho',
+              location: 'Inferior derecha',
+              description: 'Impulsa la sangre por el tronco pulmonar hacia los pulmones.',
+              examTip: 'Separado de la aurícula derecha por la válvula tricúspide.',
+              x: 164,
+              y: 184,
+            },
+            {
+              id: 'eh-3',
+              number: 3,
+              label: 'Aurícula izquierda',
+              location: 'Superior izquierda',
+              description: 'Recibe la sangre ya oxigenada por las cuatro venas pulmonares.',
+              examTip: 'Cara más posterior del corazón.',
+              x: 248,
+              y: 112,
+            },
+            {
+              id: 'eh-4',
+              number: 4,
+              label: 'Ventrículo izquierdo y Aorta',
+              location: 'Vértice cardíaco y cayado superior',
+              description: 'Su pared gruesa impulsa la sangre hacia la válvula aórtica y todo el organismo.',
+              examTip: 'Válvula mitral separa AI de VI.',
+              x: 234,
+              y: 184,
+            },
+          ],
+        },
+      },
+      steps: [
+        {
+          stepNumber: 1,
+          title: 'Ubicar la Aurícula Derecha (entrada sistémica)',
+          thinkingPrompt: 'Recordá que en posición anatómica, la derecha del paciente queda a la izquierda del esquema.',
+          explanation:
+            'La sangre venosa llega por las venas cavas superior e inferior a la aurícula derecha. Desde allí atraviesa la válvula tricúspide en diástole.',
+          watchOut: 'No confundas el lado derecho del dibujo con tu mano derecha.',
+          highlightPartNumber: 1,
+          quickCheck: {
+            question: '¿Qué válvula comunica la aurícula derecha con el ventrículo derecho?',
+            options: ['Válvula mitral', 'Válvula tricúspide', 'Válvula aórtica'],
+            correctIndex: 1,
+            feedback: 'Correcto: en el lado derecho está la válvula tricúspide; en el izquierdo la mitral.',
+          },
+        },
+        {
+          stepNumber: 2,
+          title: 'Seguir hacia el Ventrículo Derecho y circulación pulmonar',
+          thinkingPrompt: 'Observá qué vaso sale hacia arriba desde el centro del corazón.',
+          explanation:
+            'El ventrículo derecho se contrae y eyecta la sangre a través de la válvula sigmoidea pulmonar hacia el tronco pulmonar rumbo a los alvéolos para el intercambio gaseoso.',
+          watchOut: 'El tronco pulmonar es una arteria aunque lleve sangre desoxigenada.',
+          highlightPartNumber: 2,
+        },
+        {
+          stepNumber: 3,
+          title: 'Retorno oxigenado a la Aurícula Izquierda',
+          thinkingPrompt: 'Ubicá la cavidad superior del lado izquierdo del corazón.',
+          explanation:
+            'La sangre oxigenada regresa por las cuatro venas pulmonares a la aurícula izquierda y desciende por la válvula bicúspide o mitral.',
+          watchOut: 'Son cuatro venas pulmonares (dos derechas y dos izquierdas) y carecen de válvulas en su desembocadura.',
+          highlightPartNumber: 3,
+        },
+        {
+          stepNumber: 4,
+          title: 'Eyección desde el Ventrículo Izquierdo hacia la Aorta',
+          thinkingPrompt: 'Compará el grosor muscular izquierdo frente al derecho.',
+          explanation:
+            'El ventrículo izquierdo posee la pared más gruesa porque debe vencer la presión arterial sistémica y enviar sangre por la válvula aórtica hacia el cayado de la aorta.',
+          watchOut: 'El vértice (ápex) cardíaco pertenece al ventrículo izquierdo.',
+          highlightPartNumber: 4,
+          quickCheck: {
+            question: '¿Por qué la pared del ventrículo izquierdo es aproximadamente tres veces más gruesa?',
+            options: [
+              'Porque almacena el doble de volumen que el derecho',
+              'Porque debe impulsar sangre contra la alta resistencia de todo el cuerpo',
+              'Porque recibe sangre directamente de las venas cavas',
+            ],
+            correctIndex: 1,
+            feedback: 'Exacto: ambos ventrículos manejan el mismo volumen por latido, pero el izquierdo genera mucha más presión.',
+          },
+        },
+      ],
+      finalAnswer:
+        'Circulación completa identificada: Venas cavas → Aurícula derecha → Tricúspide → Ventrículo derecho → Pulmones → Venas pulmonares → Aurícula izquierda → Mitral → Ventrículo izquierdo → Aorta.',
+    },
+    {
+      id: 'ex-anat-neuron-walk',
+      title: 'Partes de la neurona y conducción del impulso',
+      topic: 'Neuroanatomía Básica',
+      difficulty: 'Parcial',
+      statement:
+        'Analizá la secuencia anatómica y funcional de una neurona multipolar desde la recepción del estímulo hasta la sinapsis.',
+      givenData: [
+        { symbol: 'Zona receptora', value: 'Dendritas y soma', unit: 'Potenciales graduados' },
+        { symbol: 'Zona conductora', value: 'Axón mielinizado', unit: 'Conducción saltatoria' },
+        { symbol: 'Zona efectora', value: 'Botones terminales', unit: 'Sinapsis química' },
+      ],
+      unknowns: [
+        'Relacionar cada estructura anatómica con su función',
+        'Identificar dónde se regenera el impulso eléctrico',
+      ],
+      visualConfig: {
+        type: 'visual_diagram',
+        caption: 'Cada paso resalta la región neuronal correspondiente.',
+        visualExample: {
+          id: 'ex-vis-neuron',
+          title: 'Anatomía funcional de la neurona',
+          categoryLabel: 'Ejemplo anatómico · Neuroanatomía',
+          caption: 'Estructura multipolar clásica',
+          templateId: 'neuron',
+          parts: [
+            {
+              id: 'en-1',
+              number: 1,
+              label: 'Dendritas',
+              location: 'Extremo receptor ramificado',
+              description: 'Captan señales sinápticas de neuronas vecinas.',
+              examTip: 'Mayor ramificación implica mayor capacidad de integración.',
+              x: 62,
+              y: 112,
+            },
+            {
+              id: 'en-2',
+              number: 2,
+              label: 'Soma y cono axónico',
+              location: 'Cuerpo celular',
+              description: 'Integra las señales entrantes y dispara el potencial de acción en el cono axónico.',
+              examTip: 'Contiene corpúsculos de Nissl (RER abundante).',
+              x: 114,
+              y: 132,
+            },
+            {
+              id: 'en-3',
+              number: 3,
+              label: 'Mielina y Nódulos de Ranvier',
+              location: 'Trayecto del axón',
+              description: 'La mielina aísla y el impulso salta de nódulo en nódulo.',
+              examTip: 'En el SNC la mielina proviene de oligodendrocitos.',
+              x: 220,
+              y: 132,
+            },
+            {
+              id: 'en-4',
+              number: 4,
+              label: 'Botones terminales',
+              location: 'Extremo distal',
+              description: 'Liberan neurotransmisores hacia la célula postsináptica.',
+              examTip: 'La entrada de Ca²⁺ dispara la fusión de vesículas.',
+              x: 356,
+              y: 132,
+            },
+          ],
+        },
+      },
+      steps: [
+        {
+          stepNumber: 1,
+          title: 'Recepción en las dendritas',
+          thinkingPrompt: 'Ubicá las ramificaciones cortas que rodean el cuerpo celular.',
+          explanation:
+            'Las dendritas actúan como antenas receptoras donde hacen contacto los terminales axónicos de otras neuronas.',
+          watchOut: 'No tienen vaina de mielina.',
+          highlightPartNumber: 1,
+        },
+        {
+          stepNumber: 2,
+          title: 'Integración en el soma y disparo en el cono axónico',
+          thinkingPrompt: 'Observá el cuerpo central donde se aloja el núcleo.',
+          explanation:
+            'El soma mantiene el metabolismo celular e integra las señales recibidas; si alcanzan el umbral, el cono axónico inicia el potencial de acción.',
+          watchOut: 'Un conjunto de somas en el SNC se llama núcleo, mientras que en el SNP se denomina ganglio.',
+          highlightPartNumber: 2,
+        },
+        {
+          stepNumber: 3,
+          title: 'Conducción saltatoria por mielina y nódulos de Ranvier',
+          thinkingPrompt: 'Mirá los segmentos aislantes alternados con pequeños espacios expuestos.',
+          explanation:
+            'La vaina de mielina impide fugas de corriente y concentra la despolarización en los nódulos de Ranvier, acelerando notablemente el impulso.',
+          watchOut: 'En enfermedades desmielinizantes como la esclerosis múltiple se enlentece o bloquea esta conducción.',
+          highlightPartNumber: 3,
+          quickCheck: {
+            question: '¿Dónde se regenera el potencial de acción durante la conducción saltatoria?',
+            options: [
+              'A lo largo de toda la vaina lipídica sin interrupciones',
+              'Únicamente en los nódulos de Ranvier',
+              'Dentro del núcleo celular',
+            ],
+            correctIndex: 1,
+            feedback: 'Exacto: los canales de sodio dependientes de voltaje se concentran en los nódulos de Ranvier.',
+          },
+        },
+        {
+          stepNumber: 4,
+          title: 'Transmisión sináptica en los botones terminales',
+          thinkingPrompt: 'Ubicá las dilataciones finales al terminar el axón.',
+          explanation:
+            'Al llegar el impulso al botón terminal, se abren canales de calcio que provocan la liberación de neurotransmisores hacia la neurona o músculo siguiente.',
+          watchOut: 'En la sinapsis química hay un retardo sináptico breve y transmisión unidireccional.',
+          highlightPartNumber: 4,
+        },
+      ],
+      finalAnswer:
+        'Polaridad funcional completada: Dendritas (recepción) → Soma/Cono axónico (integración) → Axón mielinizado/Nódulos (conducción saltatoria) → Botones terminales (liberación de neurotransmisores).',
+    },
+  ],
+};
+

@@ -8,6 +8,61 @@ export type StudyTab =
   | 'periodic'
   | 'library';
 
+export type SubjectMode = 'quantitative' | 'theoretical';
+
+export type VisualTemplateId =
+  | 'heart'
+  | 'cell'
+  | 'neuron'
+  | 'respiratory'
+  | 'nephron'
+  | 'bone'
+  | 'custom';
+
+export interface VisualDiagramPart {
+  id: string;
+  number: number;
+  label: string;
+  location: string;
+  description: string;
+  examTip: string;
+  x: number;
+  y: number;
+  color?: string;
+}
+
+export interface SvgShapePrimitive {
+  kind: 'ellipse' | 'rect' | 'circle' | 'line' | 'path' | 'polygon';
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  cx?: number;
+  cy?: number;
+  rx?: number;
+  ry?: number;
+  r?: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  d?: string;
+  points?: string;
+}
+
+export interface VisualExample {
+  id: string;
+  title: string;
+  categoryLabel: string;
+  caption: string;
+  templateId?: VisualTemplateId;
+  shapes?: SvgShapePrimitive[];
+  parts: VisualDiagramPart[];
+}
+
 export type ExamUrgencyTier = 'emergencia' | 'sprint' | 'consolidacion' | 'profundo';
 
 export interface AdaptivePriorityTopic {
@@ -114,10 +169,11 @@ export interface ExerciseStep {
   stepNumber: number;
   title: string;
   thinkingPrompt: string;
-  mathLatex: string;
+  mathLatex?: string;
   explanation: string;
   watchOut: string;
   highlightElement?: 'axes' | 'gravity' | 'normal' | 'friction' | 'applied' | 'result' | 'energy';
+  highlightPartNumber?: number;
   quickCheck?: {
     question: string;
     options: string[];
@@ -126,7 +182,12 @@ export interface ExerciseStep {
   };
 }
 
-export type VisualModelType = 'inclined_plane' | 'projectile' | 'circuit_or_generic' | 'none';
+export type VisualModelType =
+  | 'inclined_plane'
+  | 'projectile'
+  | 'visual_diagram'
+  | 'circuit_or_generic'
+  | 'none';
 
 export interface ExerciseVisualConfig {
   type: VisualModelType;
@@ -135,6 +196,7 @@ export interface ExerciseVisualConfig {
   mu?: number;
   velocityMs?: number;
   caption?: string;
+  visualExample?: VisualExample;
 }
 
 export interface StepByStepExercise {
@@ -150,11 +212,34 @@ export interface StepByStepExercise {
   finalAnswer: string;
 }
 
+export interface ExamReminderConfig {
+  enabled: boolean;
+  daysBefore: number[];
+  reminderTime: string;
+  browserNotifications: boolean;
+}
+
+export interface ExamAlert {
+  id: string;
+  planId: string;
+  subject: string;
+  examType: string;
+  examDate: string;
+  daysRemaining: number;
+  urgency: 'today' | 'tomorrow' | 'soon' | 'upcoming';
+  title: string;
+  message: string;
+  completedPct: number;
+  reminderTime: string;
+}
+
 export interface StudyPlan {
   id: string;
   subject: string;
+  subjectMode?: SubjectMode;
   examType: string;
   examDate?: string;
+  reminderConfig?: ExamReminderConfig;
   folder?: string;
   pinned?: boolean;
   createdAt: string;
@@ -164,6 +249,7 @@ export interface StudyPlan {
   pace: 'Intensivo' | 'Equilibrado' | 'Profundo';
   executiveSummary: string;
   summarySections?: SummarySection[];
+  visualExamples?: VisualExample[];
   adaptiveSummary?: AdaptiveExamSummary;
   studyBlocks: StudyBlock[];
   keyConcepts: KeyConcept[];
